@@ -1,4 +1,4 @@
-# 🛰️ ISRO Satellite Tracker
+# ISRO Satellite Tracker
 
 A lightweight, hacker-themed satellite tracking system inspired by eDEX-UI, focused on monitoring Indian Space Research Organisation (ISRO) satellites in real-time.
 
