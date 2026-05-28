@@ -28,6 +28,12 @@ interface TLELoadResult {
   source: TLEDataSource
 }
 
+interface IndianSatelliteMetadata {
+  noradId: number
+  name: string
+  launchYear: number
+}
+
 interface CelestrakOMM {
   OBJECT_NAME: string
   OBJECT_ID: string
@@ -51,31 +57,157 @@ interface CelestrakOMM {
 // Cache duration: 2 hours (Celestrak only updates every 2 hours)
 const CACHE_DURATION = 2 * 60 * 60 * 1000
 
-// Local storage key for caching
-const CACHE_KEY = 'sattrack3d_tle_cache'
+// Local storage key for caching. Versioned to avoid reusing older, broader caches.
+const CACHE_KEY = 'sattrack3d_indian_tle_cache_v2'
 
-// ISRO satellite search patterns and their types
+// N2YO India country list, launch years 2026 through 2000 inclusive.
+const INDIAN_SATELLITES_THROUGH_2000: IndianSatelliteMetadata[] = [
+  { noradId: 69010, name: 'DRISHTI', launchYear: 2026 },
+  { noradId: 66311, name: 'CMS 03', launchYear: 2025 },
+  { noradId: 65053, name: 'NISAR', launchYear: 2025 },
+  { noradId: 62850, name: 'NVS-02', launchYear: 2025 },
+  { noradId: 62460, name: 'SDX02', launchYear: 2024 },
+  { noradId: 62459, name: 'SDX01', launchYear: 2024 },
+  { noradId: 62028, name: 'GSAT 20', launchYear: 2024 },
+  { noradId: 60454, name: 'EOS-8', launchYear: 2024 },
+  { noradId: 59442, name: 'TSAT-1A', launchYear: 2024 },
+  { noradId: 58990, name: 'INSAT 3DS', launchYear: 2024 },
+  { noradId: 58694, name: 'XPOSAT', launchYear: 2024 },
+  { noradId: 57770, name: 'CH 3 PROPULSION MODULE', launchYear: 2023 },
+  { noradId: 57754, name: 'ADITYA-L1', launchYear: 2023 },
+  { noradId: 56964, name: 'AFR-1', launchYear: 2023 },
+  { noradId: 56759, name: 'NVS-01', launchYear: 2023 },
+  { noradId: 56308, name: 'POEM 2', launchYear: 2023 },
+  { noradId: 54361, name: 'EOS-6', launchYear: 2022 },
+  { noradId: 52939, name: 'POEM', launchYear: 2022 },
+  { noradId: 52903, name: 'CMS-02', launchYear: 2022 },
+  { noradId: 51656, name: 'EOS-4', launchYear: 2022 },
+  { noradId: 47256, name: 'CMS-01', launchYear: 2020 },
+  { noradId: 46905, name: 'RISAT-2BR2', launchYear: 2020 },
+  { noradId: 45026, name: 'GSAT 30', launchYear: 2020 },
+  { noradId: 44857, name: 'RISAT-2BR1', launchYear: 2019 },
+  { noradId: 44804, name: 'CARTOSAT 3', launchYear: 2019 },
+  { noradId: 44233, name: 'RISAT 2B', launchYear: 2019 },
+  { noradId: 44078, name: 'EMISAT', launchYear: 2019 },
+  { noradId: 44035, name: 'GSAT 31', launchYear: 2019 },
+  { noradId: 43864, name: 'GSAT 7A', launchYear: 2018 },
+  { noradId: 43824, name: 'GSAT 11', launchYear: 2018 },
+  { noradId: 43719, name: 'HYSIS', launchYear: 2018 },
+  { noradId: 43698, name: 'GSAT 29', launchYear: 2018 },
+  { noradId: 43286, name: 'IRNSS 1I', launchYear: 2018 },
+  { noradId: 43241, name: 'GSAT 6A', launchYear: 2018 },
+  { noradId: 43111, name: 'CARTOSAT 2F', launchYear: 2018 },
+  { noradId: 42815, name: 'GSAT 17', launchYear: 2017 },
+  { noradId: 42767, name: 'CARTOSAT 2E', launchYear: 2017 },
+  { noradId: 42747, name: 'GSAT 19', launchYear: 2017 },
+  { noradId: 42695, name: 'GSAT 9', launchYear: 2017 },
+  { noradId: 41948, name: 'CARTOSAT 2D', launchYear: 2017 },
+  { noradId: 41877, name: 'RESOURCESAT 2A', launchYear: 2016 },
+  { noradId: 41793, name: 'GSAT 18', launchYear: 2016 },
+  { noradId: 41790, name: 'SCATSAT 1', launchYear: 2016 },
+  { noradId: 41783, name: 'PRATHAM', launchYear: 2016 },
+  { noradId: 41752, name: 'INSAT 3DR', launchYear: 2016 },
+  { noradId: 41599, name: 'CARTOSAT 2C', launchYear: 2016 },
+  { noradId: 41469, name: 'IRNSS 1G', launchYear: 2016 },
+  { noradId: 41384, name: 'IRNSS 1F', launchYear: 2016 },
+  { noradId: 41241, name: 'IRNSS-1E', launchYear: 2016 },
+  { noradId: 41028, name: 'GSAT 15', launchYear: 2015 },
+  { noradId: 40880, name: 'GSAT 6', launchYear: 2015 },
+  { noradId: 40547, name: 'IRNSS 1D', launchYear: 2015 },
+  { noradId: 40332, name: 'GSAT 16', launchYear: 2014 },
+  { noradId: 40269, name: 'IRNSS 1C', launchYear: 2014 },
+  { noradId: 39635, name: 'IRNSS 1B', launchYear: 2014 },
+  { noradId: 39498, name: 'GSAT-14', launchYear: 2014 },
+  { noradId: 39370, name: 'MARS ORBITER MISSION', launchYear: 2013 },
+  { noradId: 39234, name: 'GSAT-7 (INSAT 4F)', launchYear: 2013 },
+  { noradId: 39216, name: 'INSAT 3D', launchYear: 2013 },
+  { noradId: 39199, name: 'IRNSS-1A', launchYear: 2013 },
+  { noradId: 39086, name: 'SARAL', launchYear: 2013 },
+  { noradId: 38779, name: 'GSAT 10', launchYear: 2012 },
+  { noradId: 38248, name: 'RISAT 1', launchYear: 2012 },
+  { noradId: 37841, name: 'SRMSAT', launchYear: 2011 },
+  { noradId: 37839, name: 'JUGNU', launchYear: 2011 },
+  { noradId: 37746, name: 'GSAT 12', launchYear: 2011 },
+  { noradId: 37605, name: 'GSAT 8', launchYear: 2011 },
+  { noradId: 37388, name: 'YOUTHSAT', launchYear: 2011 },
+  { noradId: 37387, name: 'RESOURCESAT 2', launchYear: 2011 },
+  { noradId: 36796, name: 'STUDSAT', launchYear: 2010 },
+  { noradId: 36795, name: 'CARTOSAT 2B', launchYear: 2010 },
+  { noradId: 35931, name: 'OCEANSAT 2', launchYear: 2009 },
+  { noradId: 33405, name: 'CHANDRAYAAN 1', launchYear: 2008 },
+  { noradId: 32786, name: 'IMS-1', launchYear: 2008 },
+  { noradId: 32783, name: 'CARTOSAT 2A', launchYear: 2008 },
+  { noradId: 32050, name: 'INSAT 4CR', launchYear: 2007 },
+  { noradId: 30793, name: 'INSAT 4B', launchYear: 2007 },
+  { noradId: 28911, name: 'INSAT 4A', launchYear: 2005 },
+  { noradId: 28650, name: 'HAMSAT (VO-52)', launchYear: 2005 },
+  { noradId: 28649, name: 'CARTOSAT-1', launchYear: 2005 },
+  { noradId: 28417, name: 'GSAT 3 (EDUSAT)', launchYear: 2004 },
+  { noradId: 28051, name: 'IRS P6', launchYear: 2003 },
+  { noradId: 27951, name: 'INSAT 3E', launchYear: 2003 },
+  { noradId: 27807, name: 'GSAT 2', launchYear: 2003 },
+  { noradId: 27714, name: 'INSAT 3A', launchYear: 2003 },
+  { noradId: 27525, name: 'KALPANA 1 (METSAT 1)', launchYear: 2002 },
+  { noradId: 27298, name: 'INSAT 3C', launchYear: 2002 },
+  { noradId: 26745, name: 'GSAT 1', launchYear: 2001 },
+  { noradId: 26108, name: 'INSAT 3B', launchYear: 2000 }
+]
+
+const INDIAN_SATELLITE_BY_NORAD_ID = new Map(
+  INDIAN_SATELLITES_THROUGH_2000.map((satelliteMetadata) => [
+    satelliteMetadata.noradId,
+    satelliteMetadata
+  ])
+)
+
+const INDIAN_NORAD_IDS = new Set(INDIAN_SATELLITES_THROUGH_2000.map(({ noradId }) => noradId))
+
+// Name searches reduce requests; the NORAD whitelist below is still the authority.
+const INDIAN_SATELLITE_QUERY_TERMS = [
+  'DRISHTI', 'CMS', 'NISAR', 'NVS', 'SDX', 'GSAT', 'EOS', 'TSAT',
+  'INSAT', 'XPOSAT', 'CHANDRAYAAN', 'ADITYA', 'AFR', 'POEM',
+  'RISAT', 'CARTOSAT', 'RESOURCESAT', 'SCATSAT', 'PRATHAM', 'IRNSS',
+  'SARAL', 'SRMSAT', 'JUGNU', 'YOUTHSAT', 'STUDSAT', 'OCEANSAT',
+  'IMS', 'HAMSAT', 'IRS', 'KALPANA', 'MARS ORBITER'
+]
+
+// Indian satellite search patterns and their display types
 const ISRO_SATELLITE_PATTERNS: { pattern: string; type: string }[] = [
   { pattern: 'CARTOSAT', type: 'Earth Observation' },
   { pattern: 'RESOURCESAT', type: 'Earth Observation' },
+  { pattern: 'IRS', type: 'Earth Observation' },
+  { pattern: 'IMS', type: 'Earth Observation' },
   { pattern: 'OCEANSAT', type: 'Oceanography' },
-  { pattern: 'EOS-', type: 'Earth Observation' },
+  { pattern: 'EOS', type: 'Earth Observation' },
   { pattern: 'RISAT', type: 'Radar Imaging' },
   { pattern: 'EMISAT', type: 'Electronic Intelligence' },
   { pattern: 'NISAR', type: 'Radar Imaging (NASA-ISRO)' },
   { pattern: 'SCATSAT', type: 'Earth Observation' },
   { pattern: 'HYSIS', type: 'Hyperspectral Imaging' },
+  { pattern: 'SARAL', type: 'Altimetry' },
   { pattern: 'IRNSS', type: 'Navigation (NavIC)' },
-  { pattern: 'NVS-', type: 'Navigation (NavIC)' },
+  { pattern: 'NVS', type: 'Navigation (NavIC)' },
   { pattern: 'GSAT', type: 'Communication (GEO)' },
+  { pattern: 'INSAT 3D', type: 'Meteorological' },
+  { pattern: 'KALPANA', type: 'Meteorological' },
   { pattern: 'INSAT', type: 'Communication (GEO)' },
-  { pattern: 'CMS-', type: 'Communication (GEO)' },
-  { pattern: 'ASTROSAT', type: 'Scientific' },
+  { pattern: 'CMS', type: 'Communication (GEO)' },
   { pattern: 'ADITYA', type: 'Scientific' },
   { pattern: 'CHANDRAYAAN', type: 'Scientific' },
-  { pattern: 'XPoSat', type: 'Scientific' },
-  { pattern: 'MICROSAT', type: 'Technology Demonstrator' },
-  { pattern: 'PS4-O', type: 'Technology Demonstrator' }
+  { pattern: 'MARS ORBITER', type: 'Scientific' },
+  { pattern: 'XPOSAT', type: 'Scientific' },
+  { pattern: 'CH 3', type: 'Lunar Mission' },
+  { pattern: 'HAMSAT', type: 'Amateur Radio' },
+  { pattern: 'PRATHAM', type: 'Student Satellite' },
+  { pattern: 'JUGNU', type: 'Student Satellite' },
+  { pattern: 'SRMSAT', type: 'Student Satellite' },
+  { pattern: 'YOUTHSAT', type: 'Scientific' },
+  { pattern: 'STUDSAT', type: 'Student Satellite' },
+  { pattern: 'POEM', type: 'Technology Demonstrator' },
+  { pattern: 'SDX', type: 'Technology Demonstrator' },
+  { pattern: 'AFR', type: 'Technology Demonstrator' },
+  { pattern: 'TSAT', type: 'Earth Observation' },
+  { pattern: 'DRISHTI', type: 'Earth Observation' }
 ]
 
 // Convert Celestrak OMM JSON to TLE format
@@ -136,6 +268,41 @@ function getSatelliteType(name: string): string {
   return 'Unknown'
 }
 
+function createTLEDataFromOMM(omm: CelestrakOMM): TLEData | null {
+  const noradId = Number(omm.NORAD_CAT_ID)
+  const metadata = INDIAN_SATELLITE_BY_NORAD_ID.get(noradId)
+  if (!metadata) return null
+
+  const { tle1, tle2 } = ommToTLE(omm)
+  return {
+    name: metadata.name,
+    type: getSatelliteType(metadata.name),
+    tle1,
+    tle2,
+    omm: {
+      ...omm,
+      NORAD_CAT_ID: noradId
+    }
+  }
+}
+
+function filterTLEToIndianSatellites(data: Record<number, TLEData>): Record<number, TLEData> {
+  const filtered: Record<number, TLEData> = {}
+
+  for (const metadata of INDIAN_SATELLITES_THROUGH_2000) {
+    const entry = data[metadata.noradId]
+    if (!entry) continue
+
+    filtered[metadata.noradId] = {
+      ...entry,
+      name: metadata.name,
+      type: getSatelliteType(metadata.name)
+    }
+  }
+
+  return filtered
+}
+
 // Fetch TLE data from Celestrak by satellite name
 async function fetchTLEByName(searchName: string): Promise<CelestrakOMM[]> {
   try {
@@ -153,38 +320,59 @@ async function fetchTLEByName(searchName: string): Promise<CelestrakOMM[]> {
   }
 }
 
-// Fetch all ISRO satellites from Celestrak
+// Fetch TLE data from Celestrak by NORAD catalog ID
+async function fetchTLEByCatalogId(noradId: number): Promise<CelestrakOMM[]> {
+  try {
+    const url = `${CELESTRAK_API}?CATNR=${noradId}&FORMAT=json`
+    const response = await fetch(url)
+    if (!response.ok) {
+      console.warn(`Celestrak API error for NORAD ${noradId}: ${response.status}`)
+      return []
+    }
+    const data = await response.json()
+    return Array.isArray(data) ? data : []
+  } catch (error) {
+    console.warn(`Failed to fetch TLE for NORAD ${noradId}:`, error)
+    return []
+  }
+}
+
+// Fetch all whitelisted Indian satellites from Celestrak
 export async function fetchISROSatellitesFromCelestrak(): Promise<Record<number, TLEData>> {
   console.log('🛰️ Fetching live TLE data from Celestrak...')
   
   const satellites: Record<number, TLEData> = {}
-  const searchTerms = [
-    'CARTOSAT', 'RESOURCESAT', 'OCEANSAT', 'EOS-0', 'RISAT', 'EMISAT',
-    'NISAR', 'SCATSAT', 'HYSIS', 'IRNSS', 'NVS-0', 'GSAT', 'INSAT-3',
-    'INSAT-4', 'CMS-0', 'ASTROSAT', 'ADITYA', 'CHANDRAYAAN', 'XPoSat'
-  ]
-
-  // Fetch in batches to avoid rate limiting
-  for (const term of searchTerms) {
+  for (const term of INDIAN_SATELLITE_QUERY_TERMS) {
     try {
       const ommData = await fetchTLEByName(term)
       for (const omm of ommData) {
-        // Skip if already have this satellite
-        if (satellites[omm.NORAD_CAT_ID]) continue
-        
-        const { tle1, tle2 } = ommToTLE(omm)
-        satellites[omm.NORAD_CAT_ID] = {
-          name: omm.OBJECT_NAME,
-          type: getSatelliteType(omm.OBJECT_NAME),
-          tle1,
-          tle2,
-          omm
-        }
+        const noradId = Number(omm.NORAD_CAT_ID)
+        if (!INDIAN_NORAD_IDS.has(noradId) || satellites[noradId]) continue
+
+        const tleData = createTLEDataFromOMM(omm)
+        if (tleData) satellites[noradId] = tleData
       }
-      // Small delay between requests to be respectful
       await new Promise(resolve => setTimeout(resolve, 100))
     } catch (error) {
       console.warn(`Error fetching ${term}:`, error)
+    }
+  }
+
+  const missingSatellites = INDIAN_SATELLITES_THROUGH_2000.filter(
+    ({ noradId }) => !satellites[noradId]
+  )
+
+  for (const { noradId } of missingSatellites) {
+    try {
+      const ommData = await fetchTLEByCatalogId(noradId)
+      const tleData = ommData
+        .map(createTLEDataFromOMM)
+        .find((entry): entry is TLEData => Boolean(entry))
+
+      if (tleData) satellites[noradId] = tleData
+      await new Promise(resolve => setTimeout(resolve, 100))
+    } catch (error) {
+      console.warn(`Error fetching NORAD ${noradId}:`, error)
     }
   }
 
@@ -209,7 +397,7 @@ function loadCachedTLE(): TLECache | null {
 function saveTLECache(data: Record<number, TLEData>): void {
   try {
     const cache: TLECache = {
-      data,
+      data: filterTLEToIndianSatellites(data),
       timestamp: Date.now()
     }
     localStorage.setItem(CACHE_KEY, JSON.stringify(cache))
@@ -227,16 +415,17 @@ export async function getTLEData(): Promise<TLELoadResult> {
   // Check cache first
   const cached = loadCachedTLE()
   const now = Date.now()
+  const cachedData = cached ? filterTLEToIndianSatellites(cached.data) : {}
   
   if (
     cached &&
-    Object.keys(cached.data).length > 0 &&
-    hasOMMData(cached.data) &&
+    Object.keys(cachedData).length > 0 &&
+    hasOMMData(cachedData) &&
     (now - cached.timestamp) < CACHE_DURATION
   ) {
     console.log('📦 Using cached TLE data (age: ' + 
       Math.round((now - cached.timestamp) / 60000) + ' minutes)')
-    return { data: cached.data, source: 'cached' }
+    return { data: cachedData, source: 'cached' }
   }
 
   // Fetch fresh data
@@ -254,18 +443,23 @@ export async function getTLEData(): Promise<TLELoadResult> {
   }
 
   // Fall back to cached data if fetch failed (even if stale)
-  if (cached && Object.keys(cached.data).length > 0 && hasOMMData(cached.data)) {
+  if (cached && Object.keys(cachedData).length > 0 && hasOMMData(cachedData)) {
     console.log('⚠️ Using stale cached TLE data')
-    return { data: cached.data, source: 'cached' }
+    return { data: cachedData, source: 'cached' }
   }
 
-  // Return empty object - SATELLITE_TLE_DATA has inline defaults
+  const fallbackData = filterTLEToIndianSatellites(SATELLITE_TLE_DATA)
+  if (Object.keys(fallbackData).length > 0) {
+    return { data: fallbackData, source: 'fallback' }
+  }
+
+  // Return empty object when no live, cached, or inline Indian entries are available
   console.log('⚠️ Using inline fallback TLE data')
   return { data: {}, source: 'fallback' }
 }
 
-// Dynamic TLE data storage - initialized with inline fallback
-export let SATELLITE_TLE_DATA: Record<number, TLEData> = {
+// Dynamic TLE data storage - initialized with whitelisted inline fallback entries
+export let SATELLITE_TLE_DATA: Record<number, TLEData> = filterTLEToIndianSatellites({
   // ===== EARTH OBSERVATION SATELLITES =====
   44804: {
     name: 'CARTOSAT-3',
@@ -434,31 +628,13 @@ export let SATELLITE_TLE_DATA: Record<number, TLEData> = {
     tle2: '2 39216   0.0521  82.2145 0001854 178.4521 276.1478  1.00269854179521'
   },
   // SCIENTIFIC
-  40930: {
-    name: 'ASTROSAT',
-    type: 'Space Observatory',
-    tle1: '1 40930U 15052A   25346.87521478  .00001478  00000+0  82145-4 0  9994',
-    tle2: '2 40930   6.0145 285.4521 0012145 315.4521  44.1478 14.76521478521478'
-  },
   39086: {
     name: 'SARAL',
     type: 'Altimetry',
     tle1: '1 39086U 13009A   25346.85214521  .00000214  00000+0  32145-4 0  9993',
     tle2: '2 39086  98.5478  95.1478 0001478  85.4521 274.7854 14.32145214521478'
-  },
-  37838: {
-    name: 'Megha-Tropiques',
-    type: 'Climate Research',
-    tle1: '1 37838U 11058A   25346.87854214  .00000145  00000+0  28521-4 0  9996',
-    tle2: '2 37838  20.0214  45.4521 0001854 275.4521 179.1478 14.21478521478521'
-  },
-  55562: {
-    name: 'EOS-07',
-    type: 'Earth Observation',
-    tle1: '1 55562U 23017A   25346.91478521  .00001854  00000+0  95214-4 0  9999',
-    tle2: '2 55562  37.1478 178.4521 0008521 105.4521 254.7854 15.12145214521478'
   }
-}
+})
 
 // Initialize TLE data - optional, for live fetching (may be skipped)
 export async function initializeTLEData(): Promise<TLEDataSource> {
@@ -675,8 +851,8 @@ export function calculateAllSatellitePositions(date: Date): SatellitePosition[] 
   
   console.log('SATELLITE_TLE_DATA keys:', Object.keys(SATELLITE_TLE_DATA).length)
   
-  for (const noradId of Object.keys(SATELLITE_TLE_DATA)) {
-    const position = calculateSatellitePosition(parseInt(noradId), date)
+  for (const { noradId } of INDIAN_SATELLITES_THROUGH_2000) {
+    const position = calculateSatellitePosition(noradId, date)
     if (position) {
       positions.push(position)
     }
@@ -688,10 +864,15 @@ export function calculateAllSatellitePositions(date: Date): SatellitePosition[] 
 
 // Get list of all tracked satellites (without positions)
 export function getSatelliteList(): { id: number; name: string; type: string; noradId: number }[] {
-  return Object.entries(SATELLITE_TLE_DATA).map(([noradId, data]) => ({
-    id: parseInt(noradId),
-    name: data.name,
-    type: data.type,
-    noradId: parseInt(noradId)
-  }))
+  return INDIAN_SATELLITES_THROUGH_2000
+    .filter(({ noradId }) => Boolean(SATELLITE_TLE_DATA[noradId]))
+    .map(({ noradId }) => {
+      const data = SATELLITE_TLE_DATA[noradId]
+      return {
+        id: noradId,
+        name: data.name,
+        type: data.type,
+        noradId
+      }
+    })
 }
