@@ -17,9 +17,11 @@ import {
   Database
 } from 'lucide-react'
 import { 
+  initializeTLEData,
   initializeSatelliteRecords, 
   calculateAllSatellitePositions,
-  type SatellitePosition 
+  type SatellitePosition,
+  type TLEDataSource
 } from './lib/satelliteTracker'
 
 // Lazy load the map component to avoid SSR issues
@@ -36,18 +38,32 @@ function App() {
   const [loadingStatus, setLoadingStatus] = useState('Initializing...')
   const [viewMode, setViewMode] = useState<'list' | 'map'>('map')
   const [isInitialized, setIsInitialized] = useState(false)
-  const dataSource = 'fallback' as const  // Using inline TLE data
+  const [dataSource, setDataSource] = useState<TLEDataSource>('fallback')
 
   // Initialize satellite records on mount
   useEffect(() => {
-    console.log('Starting initialization...')
-    setLoadingStatus('Initializing satellite records...')
-    
-    // Initialize immediately - no async needed since TLE data is inline
-    initializeSatelliteRecords()
-    
-    console.log('Initialization complete!')
-    setIsInitialized(true)
+    let isCancelled = false
+
+    async function initializeTracker() {
+      console.log('Starting initialization...')
+      setLoadingStatus('Loading current orbital elements...')
+
+      const source = await initializeTLEData()
+      if (isCancelled) return
+
+      setDataSource(source)
+      setLoadingStatus('Initializing satellite records...')
+      initializeSatelliteRecords()
+
+      console.log('Initialization complete!')
+      setIsInitialized(true)
+    }
+
+    initializeTracker()
+
+    return () => {
+      isCancelled = true
+    }
   }, [])
 
   // Update satellite positions

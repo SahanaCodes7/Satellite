@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
+import { calculateSatelliteGroundTrack } from '../lib/satelliteTracker'
 
 interface SatellitePosition {
   id: number
@@ -61,28 +62,30 @@ function MapController({ selectedSatellite }: { selectedSatellite: SatellitePosi
   return null
 }
 
-// Generate orbit path (simplified great circle approximation)
-function generateOrbitPath(lat: number, lng: number, _altitude: number): [number, number][] {
-  const points: [number, number][] = []
-  const orbitInclination = Math.abs(lat) < 10 ? 0 : Math.min(Math.abs(lat) + 20, 90)
-  
-  for (let i = 0; i <= 360; i += 5) {
-    const angle = (i * Math.PI) / 180
-    const orbitLat = orbitInclination * Math.sin(angle)
-    const orbitLng = (lng + i) % 360 - 180
-    points.push([orbitLat, orbitLng])
-  }
-  
-  return points
-}
-
 export default function SatelliteMap({ satellites, selectedSatellite, onSelectSatellite }: SatelliteMapProps) {
   const mapRef = useRef<L.Map | null>(null)
+  const trackedSatellite = selectedSatellite
+    ? satellites.find((sat) => sat.id === selectedSatellite.id) ?? selectedSatellite
+    : null
   
-  // Generate orbit path for selected satellite
-  const orbitPath = selectedSatellite 
-    ? generateOrbitPath(selectedSatellite.latitude, selectedSatellite.longitude, selectedSatellite.altitude)
-    : []
+  const orbitPath = useMemo(() => {
+    if (!trackedSatellite) return []
+
+    return calculateSatelliteGroundTrack(
+      trackedSatellite.noradId,
+      trackedSatellite.lastUpdate ?? new Date(),
+      145,
+      {
+        latitude: trackedSatellite.latitude,
+        longitude: trackedSatellite.longitude
+      }
+    )
+  }, [
+    trackedSatellite?.noradId,
+    trackedSatellite?.lastUpdate,
+    trackedSatellite?.latitude,
+    trackedSatellite?.longitude
+  ])
 
   return (
     <div className="relative w-full h-full rounded-lg overflow-hidden border border-green-900/50">
@@ -126,12 +129,13 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
         />
 
         {/* Map controller for animations */}
-        <MapController selectedSatellite={selectedSatellite} />
+        <MapController selectedSatellite={trackedSatellite} />
 
         {/* Orbit path for selected satellite */}
-        {selectedSatellite && orbitPath.length > 0 && (
+        {trackedSatellite && orbitPath.map((segment, index) => (
           <Polyline
-            positions={orbitPath}
+            key={`${trackedSatellite.id}-${index}`}
+            positions={segment}
             pathOptions={{
               color: '#00ff41',
               weight: 1,
@@ -139,14 +143,14 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
               dashArray: '5, 10'
             }}
           />
-        )}
+        ))}
 
         {/* Satellite markers */}
         {satellites.map((sat) => (
           <Marker
             key={sat.id}
             position={[sat.latitude, sat.longitude]}
-            icon={createSatelliteIcon(sat.status, selectedSatellite?.id === sat.id)}
+            icon={createSatelliteIcon(sat.status, trackedSatellite?.id === sat.id)}
             eventHandlers={{
               click: () => onSelectSatellite(sat)
             }}
@@ -179,12 +183,12 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
       </MapContainer>
 
       {/* Ground Track Info */}
-      {selectedSatellite && (
+      {trackedSatellite && (
         <div className="absolute bottom-2 left-2 z-[1000] bg-black/80 px-3 py-2 rounded border border-green-900/50 text-xs">
           <span className="text-green-600">TRACKING: </span>
-          <span className="text-green-400 font-bold">{selectedSatellite.name}</span>
+          <span className="text-green-400 font-bold">{trackedSatellite.name}</span>
           <span className="text-green-600 ml-2">| ALT: </span>
-          <span className="text-green-400">{selectedSatellite.altitude.toLocaleString()} km</span>
+          <span className="text-green-400">{trackedSatellite.altitude.toLocaleString()} km</span>
         </div>
       )}
 

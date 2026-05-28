@@ -18,6 +18,14 @@ interface TLEData {
   type: string
   tle1: string
   tle2: string
+  omm?: CelestrakOMM
+}
+
+export type TLEDataSource = 'live' | 'cached' | 'fallback'
+
+interface TLELoadResult {
+  data: Record<number, TLEData>
+  source: TLEDataSource
 }
 
 interface CelestrakOMM {
@@ -169,7 +177,8 @@ export async function fetchISROSatellitesFromCelestrak(): Promise<Record<number,
           name: omm.OBJECT_NAME,
           type: getSatelliteType(omm.OBJECT_NAME),
           tle1,
-          tle2
+          tle2,
+          omm
         }
       }
       // Small delay between requests to be respectful
@@ -209,16 +218,25 @@ function saveTLECache(data: Record<number, TLEData>): void {
   }
 }
 
+function hasOMMData(data: Record<number, TLEData>): boolean {
+  return Object.values(data).some((entry) => Boolean(entry.omm))
+}
+
 // Get TLE data (from cache or fetch fresh)
-export async function getTLEData(): Promise<Record<number, TLEData>> {
+export async function getTLEData(): Promise<TLELoadResult> {
   // Check cache first
   const cached = loadCachedTLE()
   const now = Date.now()
   
-  if (cached && Object.keys(cached.data).length > 0 && (now - cached.timestamp) < CACHE_DURATION) {
+  if (
+    cached &&
+    Object.keys(cached.data).length > 0 &&
+    hasOMMData(cached.data) &&
+    (now - cached.timestamp) < CACHE_DURATION
+  ) {
     console.log('📦 Using cached TLE data (age: ' + 
       Math.round((now - cached.timestamp) / 60000) + ' minutes)')
-    return cached.data
+    return { data: cached.data, source: 'cached' }
   }
 
   // Fetch fresh data
@@ -228,7 +246,7 @@ export async function getTLEData(): Promise<Record<number, TLEData>> {
     // If we got data, cache it and return
     if (Object.keys(freshData).length > 0) {
       saveTLECache(freshData)
-      return freshData
+      return { data: freshData, source: 'live' }
     }
     console.warn('Celestrak returned no data, using fallback')
   } catch (error) {
@@ -236,14 +254,14 @@ export async function getTLEData(): Promise<Record<number, TLEData>> {
   }
 
   // Fall back to cached data if fetch failed (even if stale)
-  if (cached && Object.keys(cached.data).length > 0) {
+  if (cached && Object.keys(cached.data).length > 0 && hasOMMData(cached.data)) {
     console.log('⚠️ Using stale cached TLE data')
-    return cached.data
+    return { data: cached.data, source: 'cached' }
   }
 
   // Return empty object - SATELLITE_TLE_DATA has inline defaults
   console.log('⚠️ Using inline fallback TLE data')
-  return {}
+  return { data: {}, source: 'fallback' }
 }
 
 // Dynamic TLE data storage - initialized with inline fallback
@@ -443,17 +461,21 @@ export let SATELLITE_TLE_DATA: Record<number, TLEData> = {
 }
 
 // Initialize TLE data - optional, for live fetching (may be skipped)
-export async function initializeTLEData(): Promise<void> {
+export async function initializeTLEData(): Promise<TLEDataSource> {
   // Try to get cached/live data but SATELLITE_TLE_DATA already has default values
   try {
-    const data = await getTLEData()
+    const { data, source } = await getTLEData()
     if (data && Object.keys(data).length > 0) {
       SATELLITE_TLE_DATA = data
+      satrecCache.clear()
       console.log(`✅ Updated with ${Object.keys(SATELLITE_TLE_DATA).length} satellites`)
+      return source
     }
   } catch (error) {
     console.warn('Using default TLE data:', error)
   }
+
+  return 'fallback'
 }
 
 export interface SatellitePosition {
@@ -473,14 +495,74 @@ export interface SatellitePosition {
 // Cache for satellite records (parsed TLEs)
 const satrecCache: Map<number, satellite.SatRec> = new Map()
 
+function createSatelliteRecord(data: TLEData): satellite.SatRec {
+  if (data.omm) {
+    return satellite.json2satrec(data.omm as satellite.OMMJsonObject)
+  }
+
+  return satellite.twoline2satrec(data.tle1, data.tle2)
+}
+
+function getSatelliteRecord(noradId: number): satellite.SatRec | null {
+  const data = SATELLITE_TLE_DATA[noradId]
+  if (!data) return null
+
+  let satrec = satrecCache.get(noradId)
+  if (satrec) return satrec
+
+  try {
+    satrec = createSatelliteRecord(data)
+    satrecCache.set(noradId, satrec)
+    return satrec
+  } catch (e) {
+    console.warn(`Failed to parse orbital data for ${data.name}:`, e)
+    return null
+  }
+}
+
+interface PropagatedState {
+  latitude: number
+  longitude: number
+  altitude: number
+  velocity: number
+}
+
+function propagateSatellite(satrec: satellite.SatRec, date: Date): PropagatedState | null {
+  const positionAndVelocity = satellite.propagate(satrec, date)
+
+  if (!positionAndVelocity) return null
+
+  const positionEci = positionAndVelocity.position as satellite.EciVec3<number> | boolean
+  const velocityEci = positionAndVelocity.velocity as satellite.EciVec3<number> | boolean
+
+  if (!positionEci || typeof positionEci === 'boolean' || !velocityEci || typeof velocityEci === 'boolean') {
+    return null
+  }
+
+  const gmst = satellite.gstime(date)
+  const positionGd = satellite.eciToGeodetic(positionEci, gmst)
+  const longitude = satellite.degreesLong(positionGd.longitude)
+  const latitude = satellite.degreesLat(positionGd.latitude)
+  const altitude = positionGd.height
+  const velocity = Math.sqrt(
+    velocityEci.x ** 2 + 
+    velocityEci.y ** 2 + 
+    velocityEci.z ** 2
+  )
+
+  return { latitude, longitude, altitude, velocity }
+}
+
 // Initialize satellite records from TLE data
 export function initializeSatelliteRecords(): void {
+  satrecCache.clear()
+
   for (const [noradId, data] of Object.entries(SATELLITE_TLE_DATA)) {
     try {
-      const satrec = satellite.twoline2satrec(data.tle1, data.tle2)
+      const satrec = createSatelliteRecord(data)
       satrecCache.set(parseInt(noradId), satrec)
     } catch (e) {
-      console.warn(`Failed to parse TLE for ${data.name}:`, e)
+      console.warn(`Failed to parse orbital data for ${data.name}:`, e)
     }
   }
 }
@@ -490,46 +572,14 @@ export function calculateSatellitePosition(noradId: number, date: Date): Satelli
   const data = SATELLITE_TLE_DATA[noradId]
   if (!data) return null
 
-  let satrec = satrecCache.get(noradId)
-  if (!satrec) {
-    try {
-      satrec = satellite.twoline2satrec(data.tle1, data.tle2)
-      satrecCache.set(noradId, satrec)
-    } catch {
-      return null
-    }
-  }
+  const satrec = getSatelliteRecord(noradId)
+  if (!satrec) return null
 
   try {
-    // Propagate satellite position
-    const positionAndVelocity = satellite.propagate(satrec, date)
-    
-    if (!positionAndVelocity || 
-        !positionAndVelocity.position || 
-        typeof positionAndVelocity.position === 'boolean') {
-      return null
-    }
+    const propagated = propagateSatellite(satrec, date)
+    if (!propagated) return null
 
-    const positionEci = positionAndVelocity.position as satellite.EciVec3<number>
-    const velocityEci = positionAndVelocity.velocity as satellite.EciVec3<number>
-
-    // Get GMST for coordinate transforms
-    const gmst = satellite.gstime(date)
-
-    // Convert ECI to Geodetic coordinates
-    const positionGd = satellite.eciToGeodetic(positionEci, gmst)
-
-    // Convert radians to degrees
-    const longitude = satellite.degreesLong(positionGd.longitude)
-    const latitude = satellite.degreesLat(positionGd.latitude)
-    const altitude = positionGd.height // Already in km
-
-    // Calculate velocity magnitude in km/s
-    const velocity = Math.sqrt(
-      velocityEci.x ** 2 + 
-      velocityEci.y ** 2 + 
-      velocityEci.z ** 2
-    )
+    const { latitude, longitude, altitude, velocity } = propagated
 
     // Simulated signal strength (based on altitude - higher = weaker)
     const signalStrength = Math.max(50, Math.min(99, 100 - (altitude / 1000)))
@@ -551,6 +601,72 @@ export function calculateSatellitePosition(noradId: number, date: Date): Satelli
     console.warn(`Failed to calculate position for ${data.name}:`, e)
     return null
   }
+}
+
+export type GroundTrackSegment = [number, number][]
+
+interface GroundTrackAnchor {
+  latitude: number
+  longitude: number
+}
+
+function getOrbitalPeriodMinutes(satrec: satellite.SatRec): number {
+  const periodMinutes = (2 * Math.PI) / satrec.no
+  return Number.isFinite(periodMinutes) && periodMinutes > 0
+    ? Math.min(periodMinutes, 24 * 60)
+    : 95
+}
+
+// Calculate one SGP4-propagated ground track centered on the requested time.
+export function calculateSatelliteGroundTrack(
+  noradId: number,
+  date: Date,
+  samples = 145,
+  anchorPoint?: GroundTrackAnchor
+): GroundTrackSegment[] {
+  const satrec = getSatelliteRecord(noradId)
+  if (!satrec) return []
+
+  const periodMinutes = getOrbitalPeriodMinutes(satrec)
+  const boundedSampleCount = Math.max(33, Math.min(samples, 361))
+  const sampleCount = boundedSampleCount % 2 === 0
+    ? boundedSampleCount + 1
+    : boundedSampleCount
+  const centerIndex = Math.floor(sampleCount / 2)
+  const stepMinutes = periodMinutes / (sampleCount - 1)
+  const startOffsetMinutes = -periodMinutes / 2
+  const segments: GroundTrackSegment[] = []
+  let segment: GroundTrackSegment = []
+  let previousLongitude: number | null = null
+
+  for (let i = 0; i < sampleCount; i += 1) {
+    const offsetMinutes = startOffsetMinutes + stepMinutes * i
+    const sampleDate = new Date(date.getTime() + offsetMinutes * 60 * 1000)
+    const propagated = propagateSatellite(satrec, sampleDate)
+
+    if (!propagated) {
+      if (segment.length > 1) segments.push(segment)
+      segment = []
+      previousLongitude = null
+      continue
+    }
+
+    const point: [number, number] = anchorPoint && i === centerIndex
+      ? [anchorPoint.latitude, anchorPoint.longitude]
+      : [propagated.latitude, propagated.longitude]
+
+    if (previousLongitude !== null && Math.abs(point[1] - previousLongitude) > 180) {
+      if (segment.length > 1) segments.push(segment)
+      segment = [point]
+    } else {
+      segment.push(point)
+    }
+
+    previousLongitude = point[1]
+  }
+
+  if (segment.length > 1) segments.push(segment)
+  return segments
 }
 
 // Calculate positions for all satellites
