@@ -1,8 +1,8 @@
-# 🛰️ ISRO Satellite Tracker
+# ISRO Satellite Tracker
 
 A lightweight, hacker-themed satellite tracking system inspired by eDEX-UI, focused on monitoring Indian Space Research Organisation (ISRO) satellites in real-time.
 
-## ⚠️ Demo Mode Notice
+## Demo Mode Notice
 
 **Current Status: Running in Demo Mode**
 
@@ -13,7 +13,7 @@ The application currently uses simulated satellite data due to CORS (Cross-Origi
 2. Use Vite proxy configuration for development
 3. Deploy with serverless functions (Vercel, Netlify)
 
-## 🎯 Features
+## Features
 
 - **Terminal-Style Interface**: Inspired by eDEX-UI with retro terminal aesthetics
 - **Real-Time Tracking**: Live monitoring of 10 key ISRO satellites
@@ -21,7 +21,7 @@ The application currently uses simulated satellite data due to CORS (Cross-Origi
 - **Signal Analysis**: Real-time signal strength and orbital data
 - **Lightweight & Fast**: Streamlined for performance and focus
 
-## �️ Tracked Satellites
+## Tracked Satellites
 
 1. **CARTOSAT-2F** - Earth Observation
 2. **IRNSS-1G** - Navigation
@@ -34,7 +34,7 @@ The application currently uses simulated satellite data due to CORS (Cross-Origi
 9. **GSAT-29** - Communication
 10. **RISAT-2B** - Radar Imaging
 
-## 🚀 Tech Stack
+## Tech Stack
 
 - **React 18** + **TypeScript**
 - **Vite** - Fast build tool
@@ -42,7 +42,7 @@ The application currently uses simulated satellite data due to CORS (Cross-Origi
 - **Framer Motion** - Animations
 - **eDEX-UI Inspired** - Terminal aesthetics
 
-## 💻 Installation
+## Installation
 
 ```bash
 # Clone the repository
@@ -59,7 +59,7 @@ npm run dev
 npm run build
 ```
 
-## 🌐 Setting Up Real-Time Data (Backend Proxy)
+## Setting Up Real-Time Data (Backend Proxy)
 
 To enable real satellite tracking, you need to bypass CORS restrictions:
 
@@ -117,7 +117,7 @@ export default defineConfig({
 
 Then update the API base URL in `src/utils/n2yo-api.ts` to use your proxy endpoint.
 
-## 🎨 Design Philosophy
+## Design Philosophy
 
 Inspired by the cyberpunk aesthetics of eDEX-UI, this satellite tracker features:
 
@@ -127,14 +127,14 @@ Inspired by the cyberpunk aesthetics of eDEX-UI, this satellite tracker features
 - **Minimalist Interface** - Focus on essential satellite data
 - **CRT-Style Effects** - Retro computer terminal vibes
 
-## 🔧 Usage
+## Usage
 
 1. **Search Satellites**: Use the terminal-style search to filter satellites
 2. **Track Status**: Monitor real-time satellite health and signals
 3. **View Details**: Click on any satellite for detailed orbital information
 4. **System Controls**: Start/stop tracking with terminal commands
 
-## 📊 Satellite Data
+## Satellite Data
 
 Each satellite displays:
 - **Real-time coordinates** (Latitude/Longitude)
@@ -143,7 +143,7 @@ Each satellite displays:
 - **System status** (Active/Inactive/Critical/Maintenance)
 - **Mission type** and launch date
 
-## 🚦 Status Indicators
+## Status Indicators
 
 - 🟢 **ACTIVE** - Operational and transmitting
 - 🟡 **MAINTENANCE** - Scheduled maintenance mode
@@ -162,7 +162,7 @@ Each satellite displays:
 
 **Built with ❤️ for satellite enthusiasts and space nerds** 🚀
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 - **Frontend**: React 18 + TypeScript
 - **Build Tool**: Vite
@@ -174,7 +174,7 @@ Each satellite displays:
 - **API**: N2YO Satellite API
 - **Date Handling**: date-fns
 
-## 📦 Installation
+## Installation
 
 1. **Clone the repository**
    ```bash
@@ -204,7 +204,7 @@ Each satellite displays:
    npm run dev
    ```
 
-## 🚀 Deployment
+## Deployment
 
 ### Build for production
 ```bash
@@ -216,7 +216,7 @@ npm run build
 npm run preview
 ```
 
-## 📱 Mobile Support
+## Mobile Support
 
 The application is fully responsive and optimized for mobile devices:
 - Touch-friendly interface
@@ -224,7 +224,7 @@ The application is fully responsive and optimized for mobile devices:
 - Progressive Web App features
 - Efficient 3D rendering for mobile GPUs
 
-## 🌐 API Integration
+## API Integration
 
 ### N2YO API Endpoints Used:
 - **TLE Data**: Get Two Line Elements for satellites
@@ -240,7 +240,7 @@ The application is fully responsive and optimized for mobile devices:
 - Radio Passes: 100 requests/hour
 - Above: 100 requests/hour
 
-## 🎯 Popular Satellites
+## Popular Satellites
 
 The app includes tracking for popular satellites:
 - International Space Station (ISS)
@@ -250,7 +250,7 @@ The app includes tracking for popular satellites:
 - GPS satellites
 - And many more...
 
-## 🔧 Development
+## Development
 
 ### Available Scripts
 - `npm run dev` - Start development server
@@ -275,7 +275,7 @@ src/
 └── index.css                 # Global styles
 ```
 
-## 🎨 Design Features
+## Design Features
 
 - **Glassmorphism UI**: Modern glass-like interface elements
 - **Space Theme**: Dark gradient backgrounds with cosmic colors
@@ -284,7 +284,7 @@ src/
 - **Responsive Design**: Mobile-first approach
 - **Accessibility**: WCAG compliant interface
 
-## 🛡️ Browser Support
+## Browser Support
 
 - Chrome 90+
 - Firefox 88+
@@ -293,11 +293,11 @@ src/
 
 WebGL support required for 3D features.
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## 🤝 Contributing
+## Contributing
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feature/amazing-feature`
@@ -305,7 +305,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 4. Push to the branch: `git push origin feature/amazing-feature`
 5. Open a Pull Request
 
-## 🆘 Support
+## Support
 
 - Create an issue for bug reports
 - Check existing issues before creating new ones
@@ -318,7 +318,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - [React Three Fiber](https://docs.pmnd.rs/react-three-fiber/)
 - [Leaflet Documentation](https://leafletjs.com/reference.html)
 
-## 🏆 Acknowledgments
+## Acknowledgments
 
 - N2YO.com for providing satellite tracking API
 - Three.js community for 3D graphics capabilities
