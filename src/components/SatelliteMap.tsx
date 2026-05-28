@@ -1,8 +1,14 @@
+<<<<<<< HEAD
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CircleMarker, MapContainer, TileLayer, Popup, Polyline, useMap, useMapEvents, Marker } from 'react-leaflet'
 import type { Map as LeafletMap } from 'leaflet'
 import L from 'leaflet'
 import satIconUrl from '../assets/satellite-icon.svg'
+=======
+import { useEffect, useMemo, useRef } from 'react'
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from 'react-leaflet'
+import L from 'leaflet'
+>>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
 import 'leaflet/dist/leaflet.css'
 import { calculateSatelliteGroundTrack } from '../lib/satelliteTracker'
 
@@ -16,7 +22,10 @@ interface SatellitePosition {
   longitude: number
   altitude: number
   velocity: number
+<<<<<<< HEAD
   launchDate?: string
+=======
+>>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
   signalStrength?: number
   lastUpdate?: Date
 }
@@ -27,14 +36,39 @@ interface SatelliteMapProps {
   onSelectSatellite: (sat: SatellitePosition) => void
 }
 
+<<<<<<< HEAD
 const getSatelliteColor = (status: string) => {
   const color = status === 'active' ? '#00ff41' : status === 'maintenance' ? '#ffea00' : '#ff0040'
   return color
+=======
+// Custom satellite icon
+const createSatelliteIcon = (status: string, isSelected: boolean) => {
+  const color = status === 'active' ? '#00ff41' : status === 'maintenance' ? '#ffea00' : '#ff0040'
+  const size = isSelected ? 20 : 14
+  
+  return L.divIcon({
+    className: 'satellite-marker',
+    html: `
+      <div style="
+        width: ${size}px;
+        height: ${size}px;
+        background: ${color};
+        border: 2px solid ${isSelected ? '#fff' : color};
+        border-radius: 50%;
+        box-shadow: 0 0 ${isSelected ? '15px' : '8px'} ${color}, 0 0 ${isSelected ? '30px' : '15px'} ${color}40;
+        animation: ${isSelected ? 'pulse 1.5s infinite' : 'none'};
+      "></div>
+    `,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+  })
+>>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
 }
 
 // Component to handle map view updates
 function MapController({ selectedSatellite }: { selectedSatellite: SatellitePosition | null }) {
   const map = useMap()
+<<<<<<< HEAD
   const previousSelectedId = useRef<number | null>(null)
   
   useEffect(() => {
@@ -68,13 +102,28 @@ function ZoomActivityController({
     setZoomLevel(map.getZoom())
   }, [map, setZoomLevel])
 
+=======
+  
+  useEffect(() => {
+    if (selectedSatellite) {
+      map.flyTo([selectedSatellite.latitude, selectedSatellite.longitude], 4, {
+        duration: 1.5
+      })
+    }
+  }, [selectedSatellite, map])
+  
+>>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
   return null
 }
 
 export default function SatelliteMap({ satellites, selectedSatellite, onSelectSatellite }: SatelliteMapProps) {
+<<<<<<< HEAD
   const mapRef = useRef<LeafletMap | null>(null)
   const [isZooming, setIsZooming] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(2)
+=======
+  const mapRef = useRef<L.Map | null>(null)
+>>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
   const trackedSatellite = selectedSatellite
     ? satellites.find((sat) => sat.id === selectedSatellite.id) ?? selectedSatellite
     : null
@@ -132,9 +181,12 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
         worldCopyJump={true}
         minZoom={2}
         maxZoom={10}
+<<<<<<< HEAD
         zoomControl={true}
         scrollWheelZoom={true}
         doubleClickZoom={true}
+=======
+>>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
       >
         {/* Dark theme map tiles */}
         <TileLayer
@@ -144,7 +196,10 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
 
         {/* Map controller for animations */}
         <MapController selectedSatellite={trackedSatellite} />
+<<<<<<< HEAD
         <ZoomActivityController setIsZooming={setIsZooming} setZoomLevel={setZoomLevel} />
+=======
+>>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
 
         {/* Orbit path for selected satellite */}
         {trackedSatellite && orbitPath.map((segment, index) => (
@@ -153,16 +208,23 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
             positions={segment}
             pathOptions={{
               color: '#00ff41',
+<<<<<<< HEAD
               weight: zoomLevel >= 6 ? 1.5 : 1.2,
               opacity: zoomLevel >= 6 ? 0.22 : 0.42,
               dashArray: zoomLevel >= 6 ? '3, 14' : '6, 10',
               lineCap: 'round',
               lineJoin: 'round'
+=======
+              weight: 1,
+              opacity: 0.4,
+              dashArray: '5, 10'
+>>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
             }}
           />
         ))}
 
         {/* Satellite markers */}
+<<<<<<< HEAD
         {satellites.map((sat) => {
           const isSelected = trackedSatellite?.id === sat.id
           if (isZooming && !isSelected) return null
@@ -241,6 +303,42 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
             )
           ]
         })}
+=======
+        {satellites.map((sat) => (
+          <Marker
+            key={sat.id}
+            position={[sat.latitude, sat.longitude]}
+            icon={createSatelliteIcon(sat.status, trackedSatellite?.id === sat.id)}
+            eventHandlers={{
+              click: () => onSelectSatellite(sat)
+            }}
+          >
+            <Popup className="satellite-popup">
+              <div className="bg-black/90 text-green-400 p-2 rounded min-w-[200px]">
+                <div className="font-bold text-sm mb-2 border-b border-green-900/50 pb-1">
+                  🛰️ {sat.name}
+                </div>
+                <div className="text-xs space-y-1">
+                  <div><span className="text-green-600">Type:</span> {sat.type}</div>
+                  <div><span className="text-green-600">NORAD:</span> {sat.noradId}</div>
+                  <div><span className="text-green-600">Lat:</span> {sat.latitude.toFixed(4)}°</div>
+                  <div><span className="text-green-600">Lng:</span> {sat.longitude.toFixed(4)}°</div>
+                  <div><span className="text-green-600">Alt:</span> {sat.altitude.toLocaleString()} km</div>
+                  <div><span className="text-green-600">Vel:</span> {sat.velocity} km/s</div>
+                  <div className="pt-1 border-t border-green-900/50 mt-1">
+                    <span className={`uppercase font-bold ${
+                      sat.status === 'active' ? 'text-green-400' :
+                      sat.status === 'maintenance' ? 'text-yellow-400' : 'text-red-400'
+                    }`}>
+                      ● {sat.status}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        ))}
+>>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
       </MapContainer>
 
       {/* Ground Track Info */}
@@ -270,6 +368,7 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
         .leaflet-popup-tip {
           background: rgba(0, 0, 0, 0.9) !important;
         }
+<<<<<<< HEAD
         .satellite-dot {
           filter: drop-shadow(0 0 5px currentColor) drop-shadow(0 0 10px currentColor);
           cursor: pointer;
@@ -294,6 +393,15 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
         @keyframes satellite-glow {
           0%, 100% { opacity: 1; stroke-opacity: 1; fill-opacity: 1; }
           50% { opacity: 0.7; stroke-opacity: 0.9; fill-opacity: 0.75; }
+=======
+        .satellite-marker {
+          background: transparent !important;
+          border: none !important;
+        }
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.3); opacity: 0.7; }
+>>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
         }
         .leaflet-control-zoom a {
           background: rgba(0, 0, 0, 0.8) !important;
