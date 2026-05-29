@@ -39,10 +39,7 @@ function App() {
   const [viewMode, setViewMode] = useState<'list' | 'map'>('map')
   const [isInitialized, setIsInitialized] = useState(false)
   const [dataSource, setDataSource] = useState<TLEDataSource>('fallback')
-<<<<<<< HEAD
   const [trackingSatelliteId, setTrackingSatelliteId] = useState<number | null>(null)
-=======
->>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
 
   // Initialize satellite records on mount
   useEffect(() => {
@@ -52,7 +49,6 @@ function App() {
       console.log('Starting initialization...')
       setLoadingStatus('Loading current orbital elements...')
 
-<<<<<<< HEAD
       // Add a timeout so we don't hang if TLE fetching stalls
       const timeoutMs = 8000
       const timeoutPromise = new Promise<TLEDataSource>((resolve) => {
@@ -71,9 +67,6 @@ function App() {
         source = 'fallback'
       }
 
-=======
-      const source = await initializeTLEData()
->>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
       if (isCancelled) return
 
       setDataSource(source)
@@ -166,7 +159,6 @@ function App() {
     })
   }
 
-<<<<<<< HEAD
   const trackSatellite = (sat: SatelliteData) => {
     setTrackingSatelliteId(sat.id)
     setSelectedSatellite(sat)
@@ -177,8 +169,6 @@ function App() {
     }, 450)
   }
 
-=======
->>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#0a0a0f] flex items-center justify-center">
@@ -281,14 +271,9 @@ function App() {
       {/* Map View */}
       {viewMode === 'map' && (
         <motion.div
-<<<<<<< HEAD
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, ease: 'easeOut' }}
-=======
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
->>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
           className="grid grid-cols-1 lg:grid-cols-4 gap-4"
         >
           {/* Map Panel */}
@@ -329,13 +314,10 @@ function App() {
                     <span className="font-bold">{selectedSatellite.noradId}</span>
                   </div>
                   <div className="flex justify-between items-center p-2 bg-black/20 rounded">
-<<<<<<< HEAD
                     <span className="text-green-600">LAUNCH DATE</span>
                     <span className="font-bold">{selectedSatellite.launchDate}</span>
                   </div>
                   <div className="flex justify-between items-center p-2 bg-black/20 rounded">
-=======
->>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
                     <span className="text-green-600">LATITUDE</span>
                     <span className="font-bold">{selectedSatellite.latitude.toFixed(4)}°</span>
                   </div>
@@ -377,26 +359,18 @@ function App() {
 
       {/* List View */}
       {viewMode === 'list' && (
-<<<<<<< HEAD
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, ease: 'easeOut' }}
           className="grid grid-cols-1 xl:grid-cols-4 gap-4"
         >
-=======
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
->>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
           {/* Satellite List Panel */}
           <motion.div 
             initial={{ opacity: 0, x: -20 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.2 }}
-<<<<<<< HEAD
             className="terminal-panel p-4 xl:col-span-3"
-=======
-            className="terminal-panel p-4 lg:col-span-1"
->>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
           >
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold flex items-center gap-2">
@@ -405,7 +379,6 @@ function App() {
               </h2>
               <span className="text-xs text-green-600">[{satellites.length} ONLINE]</span>
             </div>
-<<<<<<< HEAD
             <div className="grid grid-cols-[minmax(220px,1fr)_110px_120px_140px] items-center gap-4 border-b border-green-900/50 px-3 pb-2 text-[11px] font-bold uppercase tracking-wider text-green-700">
               <span>Satellite Name</span>
               <span className="text-right">NORAD ID</span>
@@ -460,31 +433,6 @@ function App() {
                       'TRACK IT'
                     )}
                   </motion.button>
-=======
-            <div className="space-y-2 max-h-[500px] overflow-y-auto custom-scrollbar">
-              {satellites.map((sat) => (
-                <motion.div
-                  key={sat.id}
-                  whileHover={{ scale: 1.02 }}
-                  onClick={() => setSelectedSatellite(sat)}
-                  className={`p-3 rounded cursor-pointer transition-all border ${
-                    selectedSatellite?.id === sat.id 
-                      ? 'bg-green-900/30 border-green-500' 
-                      : 'bg-black/20 border-green-900/30 hover:border-green-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-2 h-2 rounded-full ${
-                        sat.status === 'active' ? 'bg-green-400 animate-pulse' : 
-                        sat.status === 'maintenance' ? 'bg-yellow-400' : 'bg-red-400'
-                      }`} />
-                      <span className="font-bold text-sm">{sat.name}</span>
-                    </div>
-                    <span className="text-xs text-green-600">{sat.noradId}</span>
-                  </div>
-                  <div className="text-xs text-green-600 mt-1">{sat.type}</div>
->>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
                 </motion.div>
               ))}
             </div>
@@ -495,11 +443,7 @@ function App() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
-<<<<<<< HEAD
             className="terminal-panel p-4 xl:col-span-1"
-=======
-            className="terminal-panel p-4 lg:col-span-2"
->>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
           >
             <h2 className="text-lg font-bold flex items-center gap-2 mb-4">
               <Activity className="w-5 h-5" />
@@ -529,13 +473,10 @@ function App() {
                     <div className="text-lg font-bold">{selectedSatellite.noradId}</div>
                   </div>
                   <div className="bg-black/20 p-4 rounded border border-green-900/30">
-<<<<<<< HEAD
                     <div className="text-xs text-green-600 mb-1">LAUNCH DATE</div>
                     <div className="text-lg font-bold">{selectedSatellite.launchDate}</div>
                   </div>
                   <div className="bg-black/20 p-4 rounded border border-green-900/30">
-=======
->>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
                     <div className="text-xs text-green-600 mb-1">LATITUDE</div>
                     <div className="text-lg font-bold">{selectedSatellite.latitude.toFixed(4)}°</div>
                   </div>
@@ -586,11 +527,7 @@ function App() {
               </div>
             )}
           </motion.div>
-<<<<<<< HEAD
         </motion.div>
-=======
-        </div>
->>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
       )}
 
       {/* Footer Status Bar */}

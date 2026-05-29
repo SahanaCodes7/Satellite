@@ -32,11 +32,8 @@ interface IndianSatelliteMetadata {
   noradId: number
   name: string
   launchYear: number
-<<<<<<< HEAD
   launchMonth: number
   launchDay: number
-=======
->>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
 }
 
 interface CelestrakOMM {
@@ -67,7 +64,6 @@ const CACHE_KEY = 'sattrack3d_indian_tle_cache_v2'
 
 // N2YO India country list, launch years 2026 through 2000 inclusive.
 const INDIAN_SATELLITES_THROUGH_2000: IndianSatelliteMetadata[] = [
-<<<<<<< HEAD
   { noradId: 69010, name: 'DRISHTI', launchYear: 2026, launchMonth: 1, launchDay: 15 },
   { noradId: 66311, name: 'CMS 03', launchYear: 2025, launchMonth: 12, launchDay: 16 },
   { noradId: 65053, name: 'NISAR', launchYear: 2025, launchMonth: 1, launchDay: 14 },
@@ -157,97 +153,6 @@ const INDIAN_SATELLITES_THROUGH_2000: IndianSatelliteMetadata[] = [
   { noradId: 27298, name: 'INSAT 3C', launchYear: 2002, launchMonth: 12, launchDay: 24 },
   { noradId: 26745, name: 'GSAT 1', launchYear: 2001, launchMonth: 4, launchDay: 18 },
   { noradId: 26108, name: 'INSAT 3B', launchYear: 2000, launchMonth: 3, launchDay: 22 }
-=======
-  { noradId: 69010, name: 'DRISHTI', launchYear: 2026 },
-  { noradId: 66311, name: 'CMS 03', launchYear: 2025 },
-  { noradId: 65053, name: 'NISAR', launchYear: 2025 },
-  { noradId: 62850, name: 'NVS-02', launchYear: 2025 },
-  { noradId: 62460, name: 'SDX02', launchYear: 2024 },
-  { noradId: 62459, name: 'SDX01', launchYear: 2024 },
-  { noradId: 62028, name: 'GSAT 20', launchYear: 2024 },
-  { noradId: 60454, name: 'EOS-8', launchYear: 2024 },
-  { noradId: 59442, name: 'TSAT-1A', launchYear: 2024 },
-  { noradId: 58990, name: 'INSAT 3DS', launchYear: 2024 },
-  { noradId: 58694, name: 'XPOSAT', launchYear: 2024 },
-  { noradId: 57770, name: 'CH 3 PROPULSION MODULE', launchYear: 2023 },
-  { noradId: 57754, name: 'ADITYA-L1', launchYear: 2023 },
-  { noradId: 56964, name: 'AFR-1', launchYear: 2023 },
-  { noradId: 56759, name: 'NVS-01', launchYear: 2023 },
-  { noradId: 56308, name: 'POEM 2', launchYear: 2023 },
-  { noradId: 54361, name: 'EOS-6', launchYear: 2022 },
-  { noradId: 52939, name: 'POEM', launchYear: 2022 },
-  { noradId: 52903, name: 'CMS-02', launchYear: 2022 },
-  { noradId: 51656, name: 'EOS-4', launchYear: 2022 },
-  { noradId: 47256, name: 'CMS-01', launchYear: 2020 },
-  { noradId: 46905, name: 'RISAT-2BR2', launchYear: 2020 },
-  { noradId: 45026, name: 'GSAT 30', launchYear: 2020 },
-  { noradId: 44857, name: 'RISAT-2BR1', launchYear: 2019 },
-  { noradId: 44804, name: 'CARTOSAT 3', launchYear: 2019 },
-  { noradId: 44233, name: 'RISAT 2B', launchYear: 2019 },
-  { noradId: 44078, name: 'EMISAT', launchYear: 2019 },
-  { noradId: 44035, name: 'GSAT 31', launchYear: 2019 },
-  { noradId: 43864, name: 'GSAT 7A', launchYear: 2018 },
-  { noradId: 43824, name: 'GSAT 11', launchYear: 2018 },
-  { noradId: 43719, name: 'HYSIS', launchYear: 2018 },
-  { noradId: 43698, name: 'GSAT 29', launchYear: 2018 },
-  { noradId: 43286, name: 'IRNSS 1I', launchYear: 2018 },
-  { noradId: 43241, name: 'GSAT 6A', launchYear: 2018 },
-  { noradId: 43111, name: 'CARTOSAT 2F', launchYear: 2018 },
-  { noradId: 42815, name: 'GSAT 17', launchYear: 2017 },
-  { noradId: 42767, name: 'CARTOSAT 2E', launchYear: 2017 },
-  { noradId: 42747, name: 'GSAT 19', launchYear: 2017 },
-  { noradId: 42695, name: 'GSAT 9', launchYear: 2017 },
-  { noradId: 41948, name: 'CARTOSAT 2D', launchYear: 2017 },
-  { noradId: 41877, name: 'RESOURCESAT 2A', launchYear: 2016 },
-  { noradId: 41793, name: 'GSAT 18', launchYear: 2016 },
-  { noradId: 41790, name: 'SCATSAT 1', launchYear: 2016 },
-  { noradId: 41783, name: 'PRATHAM', launchYear: 2016 },
-  { noradId: 41752, name: 'INSAT 3DR', launchYear: 2016 },
-  { noradId: 41599, name: 'CARTOSAT 2C', launchYear: 2016 },
-  { noradId: 41469, name: 'IRNSS 1G', launchYear: 2016 },
-  { noradId: 41384, name: 'IRNSS 1F', launchYear: 2016 },
-  { noradId: 41241, name: 'IRNSS-1E', launchYear: 2016 },
-  { noradId: 41028, name: 'GSAT 15', launchYear: 2015 },
-  { noradId: 40880, name: 'GSAT 6', launchYear: 2015 },
-  { noradId: 40547, name: 'IRNSS 1D', launchYear: 2015 },
-  { noradId: 40332, name: 'GSAT 16', launchYear: 2014 },
-  { noradId: 40269, name: 'IRNSS 1C', launchYear: 2014 },
-  { noradId: 39635, name: 'IRNSS 1B', launchYear: 2014 },
-  { noradId: 39498, name: 'GSAT-14', launchYear: 2014 },
-  { noradId: 39370, name: 'MARS ORBITER MISSION', launchYear: 2013 },
-  { noradId: 39234, name: 'GSAT-7 (INSAT 4F)', launchYear: 2013 },
-  { noradId: 39216, name: 'INSAT 3D', launchYear: 2013 },
-  { noradId: 39199, name: 'IRNSS-1A', launchYear: 2013 },
-  { noradId: 39086, name: 'SARAL', launchYear: 2013 },
-  { noradId: 38779, name: 'GSAT 10', launchYear: 2012 },
-  { noradId: 38248, name: 'RISAT 1', launchYear: 2012 },
-  { noradId: 37841, name: 'SRMSAT', launchYear: 2011 },
-  { noradId: 37839, name: 'JUGNU', launchYear: 2011 },
-  { noradId: 37746, name: 'GSAT 12', launchYear: 2011 },
-  { noradId: 37605, name: 'GSAT 8', launchYear: 2011 },
-  { noradId: 37388, name: 'YOUTHSAT', launchYear: 2011 },
-  { noradId: 37387, name: 'RESOURCESAT 2', launchYear: 2011 },
-  { noradId: 36796, name: 'STUDSAT', launchYear: 2010 },
-  { noradId: 36795, name: 'CARTOSAT 2B', launchYear: 2010 },
-  { noradId: 35931, name: 'OCEANSAT 2', launchYear: 2009 },
-  { noradId: 33405, name: 'CHANDRAYAAN 1', launchYear: 2008 },
-  { noradId: 32786, name: 'IMS-1', launchYear: 2008 },
-  { noradId: 32783, name: 'CARTOSAT 2A', launchYear: 2008 },
-  { noradId: 32050, name: 'INSAT 4CR', launchYear: 2007 },
-  { noradId: 30793, name: 'INSAT 4B', launchYear: 2007 },
-  { noradId: 28911, name: 'INSAT 4A', launchYear: 2005 },
-  { noradId: 28650, name: 'HAMSAT (VO-52)', launchYear: 2005 },
-  { noradId: 28649, name: 'CARTOSAT-1', launchYear: 2005 },
-  { noradId: 28417, name: 'GSAT 3 (EDUSAT)', launchYear: 2004 },
-  { noradId: 28051, name: 'IRS P6', launchYear: 2003 },
-  { noradId: 27951, name: 'INSAT 3E', launchYear: 2003 },
-  { noradId: 27807, name: 'GSAT 2', launchYear: 2003 },
-  { noradId: 27714, name: 'INSAT 3A', launchYear: 2003 },
-  { noradId: 27525, name: 'KALPANA 1 (METSAT 1)', launchYear: 2002 },
-  { noradId: 27298, name: 'INSAT 3C', launchYear: 2002 },
-  { noradId: 26745, name: 'GSAT 1', launchYear: 2001 },
-  { noradId: 26108, name: 'INSAT 3B', launchYear: 2000 }
->>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
 ]
 
 const INDIAN_SATELLITE_BY_NORAD_ID = new Map(
@@ -761,10 +666,7 @@ export interface SatellitePosition {
   longitude: number
   altitude: number
   velocity: number
-<<<<<<< HEAD
   launchDate: string
-=======
->>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
   signalStrength: number
   lastUpdate: Date
 }
@@ -830,7 +732,6 @@ function propagateSatellite(satrec: satellite.SatRec, date: Date): PropagatedSta
   return { latitude, longitude, altitude, velocity }
 }
 
-<<<<<<< HEAD
 // Format launch date from satellite metadata
 function formatLaunchDate(satellite: IndianSatelliteMetadata | undefined): string | undefined {
   if (!satellite) return undefined
@@ -841,8 +742,6 @@ function formatLaunchDate(satellite: IndianSatelliteMetadata | undefined): strin
   return `${monthName} ${satellite.launchDay}, ${satellite.launchYear}`
 }
 
-=======
->>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
 // Initialize satellite records from TLE data
 export function initializeSatelliteRecords(): void {
   satrecCache.clear()
@@ -884,10 +783,7 @@ export function calculateSatellitePosition(noradId: number, date: Date): Satelli
       longitude: parseFloat(longitude.toFixed(4)),
       altitude: Math.round(altitude),
       velocity: parseFloat(velocity.toFixed(2)),
-<<<<<<< HEAD
       launchDate: formatLaunchDate(INDIAN_SATELLITE_BY_NORAD_ID.get(noradId)) ?? 'Unknown',
-=======
->>>>>>> a6f50b486840728adc4bc633f110c534a946bf64
       signalStrength: Math.round(signalStrength),
       lastUpdate: date
     }
