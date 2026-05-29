@@ -187,32 +187,25 @@ Each satellite displays:
    npm install
    ```
 
-3. **Set up environment variables**
-   ```bash
-   cp .env.example .env
-   # Edit .env and add your N2YO API key
-   ```
+3. **No env file is required for the current build**
+  - `.env` is ignored by Git and is not used by the GitHub Pages workflow.
+  - If you later add a backend proxy, keep secrets local and out of the repo.
 
-4. **Get N2YO API Key**
-   - Visit [N2YO API](https://www.n2yo.com/api/)
-   - Register for a free account
-   - Generate your API key from your profile page
-   - Add it to your `.env` file
-
-5. **Start development server**
+4. **Start development server**
    ```bash
    npm run dev
    ```
 
 ## Deployment
 
-### Build for production
+### GitHub Pages deployment
+1. Push your changes to GitHub.
+2. In the repository settings, open **Pages** and set **Source** to **GitHub Actions**.
+3. The workflow in `.github/workflows/deploy.yml` builds and deploys automatically on every push to `main`.
+
+### Local production check
 ```bash
 npm run build
-```
-
-### Preview production build
-```bash
 npm run preview
 ```
 
