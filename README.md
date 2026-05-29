@@ -23,7 +23,7 @@ A high-fidelity satellite tracking platform engineered for space professionals, 
 
 ---
 
-## 📸 Preview
+## 📸 Preview 
 
 ### 🚀 System Initialization
 ![Hero](./assets/screenshots/hero-loading.png)
