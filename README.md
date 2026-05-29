@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # 🛰️ ISRO Satellite Tracker
 
 <div align="center">
@@ -15,7 +15,7 @@
 
 ---
 
-## 🌌 Vision
+## Vision
 
 A high-fidelity satellite tracking platform engineered for space professionals, researchers, and enthusiasts. Built with cyberpunk aesthetics inspired by eDEX-UI and military command centers, this system delivers real-time orbital monitoring, telemetry analysis, and predictive tracking for Indian Space Research Organisation (ISRO) satellites and international constellations.
 
@@ -23,29 +23,13 @@ A high-fidelity satellite tracking platform engineered for space professionals, 
 
 ---
 
-## 📸 Preview
-
-### 🚀 System Initialization
-![Hero](./assets/screenshots/hero-loading.png)
-
-### 🌍 Real-Time Global Satellite Tracking  
-![Map](./assets/screenshots/world-map.png)
-
-### 🛰️ Live Satellite Telemetry
-![Telemetry](./assets/screenshots/satellite-details.png)
-
-### 📡 Advanced Tracking Console
-![Console](./assets/screenshots/telemetry-panel.png)
-
----
-
-## ✨ Project Highlights
+##  Project Highlights
 
 <table>
 <tr>
 <td width="50%">
 
-### 🎯 Core Features
+###  Core Features
 - **Real-Time Tracking**: Live positional data for 10+ critical ISRO satellites
 - **Terminal UI**: Authentic eDEX-UI inspired interface with hacker aesthetics
 - **Orbital Propagation**: Advanced TLE-based satellite position calculations
@@ -74,7 +58,7 @@ A high-fidelity satellite tracking platform engineered for space professionals, 
 
 ---
 
-## 🛰️ Tracked Satellite Constellation
+## Tracked Satellite Constellation
 
 | Satellite | Mission | Type | Status |
 |-----------|---------|------|--------|
@@ -91,7 +75,7 @@ A high-fidelity satellite tracking platform engineered for space professionals, 
 
 ---
 
-## 🏗️ System Architecture
+## System Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -128,7 +112,7 @@ A high-fidelity satellite tracking platform engineered for space professionals, 
 
 ---
 
-## 🚀 Quick Start
+##  Quick Start
 
 ### Prerequisites
 - Node.js 18.0+ ([Download](https://nodejs.org/))
@@ -307,7 +291,7 @@ app.get('/api/satellite/positions/:id/:lat/:lng/:alt/:seconds', async (req, res)
 
 app.listen(3001, () => {
 <<<<<<< HEAD
-  console.log('🚀 Proxy server running on http://localhost:3001');
+  console.log('Proxy server running on http://localhost:3001');
 });
 ```
 
@@ -383,7 +367,7 @@ export default defineConfig({
 
 ---
 
-## 📡 API Reference
+##  API Reference
 
 ### N2YO API Endpoints
 
@@ -414,7 +398,7 @@ const data = await response.json();
 
 ---
 
-## 🎨 Design Philosophy & Aesthetics
+##  Design Philosophy & Aesthetics
 
 Inspired by military command centers and eDEX-UI, this interface delivers:
 
@@ -438,7 +422,7 @@ Inspired by military command centers and eDEX-UI, this interface delivers:
 
 ---
 
-## 📊 Data Telemetry & Analytics
+## Data Telemetry & Analytics
 
 ### Real-Time Metrics
 ```
@@ -535,7 +519,7 @@ npm run deploy       # Deploy to configured hosting (if configured)
 
 ---
 
-## ⚡ Performance Optimization
+## Performance Optimization
 
 ### Rendering Performance
 - **Component Memoization**: React.memo for expensive components
@@ -557,7 +541,7 @@ npm run deploy       # Deploy to configured hosting (if configured)
 
 ---
 
-## 🔒 Security & Best Practices
+## Security & Best Practices
 
 ### API Key Management
 ```bash
@@ -580,16 +564,16 @@ VITE_API_PROXY=http://localhost:3001/api
 
 ---
 
-## 🌐 Browser Support & Compatibility
+## Browser Support & Compatibility
 
 | Browser | Version | Status | WebGL |
 |---------|---------|--------|-------|
-| Chrome | 90+ | ✅ Full Support | Yes |
-| Firefox | 88+ | ✅ Full Support | Yes |
-| Safari | 14+ | ✅ Full Support | Yes |
-| Edge | 90+ | ✅ Full Support | Yes |
-| Mobile Chrome | Latest | ✅ Optimized | Yes |
-| Mobile Safari | 14+ | ✅ Optimized | Yes |
+| Chrome | 90+ | Full Support | Yes |
+| Firefox | 88+ | Full Support | Yes |
+| Safari | 14+ | Full Support | Yes |
+| Edge | 90+ | Full Support | Yes |
+| Mobile Chrome | Latest | Optimized | Yes |
+| Mobile Safari | 14+ | Optimized | Yes |
 
 ### Fallbacks
 - WebGL unavailable → 2D canvas rendering
@@ -598,7 +582,7 @@ VITE_API_PROXY=http://localhost:3001/api
 
 ---
 
-## 🚀 Deployment
+## Deployment
 
 ### Docker Deployment
 
@@ -747,7 +731,7 @@ Each satellite displays:
 
 ---
 
-**Built with ❤️ for satellite enthusiasts and space nerds** 🚀
+**Built with ❤️ for satellite enthusiasts and space nerds** 
 
 ## Tech Stack
 
