@@ -1,4 +1,5 @@
 import { useState, useEffect, lazy, Suspense, useCallback } from 'react'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { 
   Satellite, 
@@ -23,6 +24,9 @@ import {
   type SatellitePosition,
   type TLEDataSource
 } from './lib/satelliteTracker'
+import Globe3D from './components/Globe3D'
+import NavBar from './components/NavBar'
+import { UIProvider } from './contexts/UIContext'
 
 // Lazy load the map component to avoid SSR issues
 const SatelliteMap = lazy(() => import('./components/SatelliteMap'))
@@ -30,7 +34,7 @@ const SatelliteMap = lazy(() => import('./components/SatelliteMap'))
 // Re-export SatellitePosition as SatelliteData for compatibility
 type SatelliteData = SatellitePosition
 
-function App() {
+function SatelliteTracker() {
   const [satellites, setSatellites] = useState<SatelliteData[]>([])
   const [selectedSatellite, setSelectedSatellite] = useState<SatelliteData | null>(null)
   const [systemTime, setSystemTime] = useState(new Date())
@@ -557,6 +561,21 @@ function App() {
         </div>
       </motion.footer>
     </div>
+  )
+}
+
+function App() {
+  return (
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
+      <UIProvider>
+        <NavBar />
+        <Routes>
+          <Route path="/" element={<SatelliteTracker />} />
+          <Route path="/globe" element={<Globe3D />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </UIProvider>
+    </BrowserRouter>
   )
 }
 

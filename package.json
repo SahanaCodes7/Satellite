@@ -21,6 +21,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-leaflet": "^4.2.1",
+    "react-router-dom": "^6.26.2",
     "satellite.js": "^6.0.1",
     "three": "^0.168.0"
   },
