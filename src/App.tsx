@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense, useCallback } from 'react'
+import { useState, useEffect, lazy, Suspense, useCallback, useContext } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { 
@@ -26,7 +26,7 @@ import {
 } from './lib/satelliteTracker'
 import Globe3D from './components/Globe3D'
 import NavBar from './components/NavBar'
-import { UIProvider } from './contexts/UIContext'
+import { UIContext, UIProvider } from './contexts/UIContext'
 
 // Lazy load the map component to avoid SSR issues
 const SatelliteMap = lazy(() => import('./components/SatelliteMap'))
@@ -44,6 +44,7 @@ function SatelliteTracker() {
   const [isInitialized, setIsInitialized] = useState(false)
   const [dataSource, setDataSource] = useState<TLEDataSource>('fallback')
   const [trackingSatelliteId, setTrackingSatelliteId] = useState<number | null>(null)
+  const { onSatelliteSelect } = useContext(UIContext)
 
   // Initialize satellite records on mount
   useEffect(() => {
@@ -126,6 +127,15 @@ function SatelliteTracker() {
       clearInterval(updateInterval)
     }
   }, [isInitialized, updatePositions])
+
+  useEffect(() => {
+    if (!onSatelliteSelect) return
+    const unsubscribe = onSatelliteSelect((satellite: SatelliteData) => {
+      if (!satellite) return
+      setSelectedSatellite(satellite)
+    })
+    return () => unsubscribe()
+  }, [onSatelliteSelect])
 
   const getStatusColor = (status: string) => {
     switch (status) {

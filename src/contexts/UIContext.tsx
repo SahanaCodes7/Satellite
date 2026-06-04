@@ -4,19 +4,21 @@ type SearchSubmitHandler = (query: string) => void
 
 export const UIContext = createContext({
   searchQuery: '',
-  setSearchQuery: (q: string) => {},
+  setSearchQuery: (_q: string) => {},
   totalSatellites: 0,
-  setTotalSatellites: (n: number) => {},
+  setTotalSatellites: (_n: number) => {},
   matchCount: 0,
-  setMatchCount: (n: number) => {},
-  onSearchSubmit: (handler: SearchSubmitHandler) => () => {},
-  emitSearchSubmit: (q: string) => {},
-  registerCanvas: (canvas: HTMLCanvasElement | null) => {},
+  setMatchCount: (_n: number) => {},
+  onSearchSubmit: (_handler: SearchSubmitHandler) => () => {},
+  emitSearchSubmit: (_q: string) => {},
+  onSatelliteSelect: (_handler: (satellite: any) => void) => () => {},
+  emitSatelliteSelect: (_satellite: any) => {},
+  registerCanvas: (_canvas: HTMLCanvasElement | null) => {},
   takeScreenshot: () => {},
   showLegend: false,
-  setShowLegend: (v: boolean) => {},
+  setShowLegend: (_v: boolean) => {},
   showPassesPanel: false,
-  setShowPassesPanel: (v: boolean) => {}
+  setShowPassesPanel: (_v: boolean) => {}
 } as any)
 
 export function UIProvider({ children }: { children: React.ReactNode }) {
@@ -40,6 +42,19 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
 
   const emitSearchSubmit = useCallback((q: string) => {
     eventTarget.dispatchEvent(new CustomEvent('searchSubmit', { detail: { query: q } }))
+  }, [eventTarget])
+
+  const onSatelliteSelect = useCallback((handler: (satellite: any) => void) => {
+    const listener = (ev: Event) => {
+      const detail = (ev as CustomEvent).detail as { satellite: any }
+      handler(detail.satellite)
+    }
+    eventTarget.addEventListener('satelliteSelect', listener as EventListener)
+    return () => eventTarget.removeEventListener('satelliteSelect', listener as EventListener)
+  }, [eventTarget])
+
+  const emitSatelliteSelect = useCallback((satellite: any) => {
+    eventTarget.dispatchEvent(new CustomEvent('satelliteSelect', { detail: { satellite } }))
   }, [eventTarget])
 
   const registerCanvas = useCallback((canvas: HTMLCanvasElement | null) => {
@@ -66,6 +81,8 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         setMatchCount,
         onSearchSubmit,
         emitSearchSubmit,
+        onSatelliteSelect,
+        emitSatelliteSelect,
         registerCanvas,
         takeScreenshot,
         showLegend,

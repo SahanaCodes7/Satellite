@@ -214,30 +214,29 @@ function useSafeTexture(url: string) {
   return { texture, failed }
 }
 
-function createGlowDotTexture() {
+function createDotTexture(color: string) {
   const canvas = document.createElement('canvas')
-  const context = canvas.getContext('2d')
-  canvas.width = 64
-  canvas.height = 64
-  if (!context) return null
+  const ctx = canvas.getContext('2d')
+  canvas.width = 128
+  canvas.height = 128
+  if (!ctx) return null
 
-  // outer soft glow (large, very transparent)
-  const outerGlow = context.createRadialGradient(32, 32, 8, 32, 32, 32)
-  outerGlow.addColorStop(0, 'rgba(0, 255, 65, 0.5)')
-  outerGlow.addColorStop(1, 'rgba(0, 255, 65, 0)')
-  context.fillStyle = outerGlow
-  context.fillRect(0, 0, 64, 64)
+  const rgbaColor = color
+  const outerGlow = ctx.createRadialGradient(64, 64, 10, 64, 64, 64)
+  outerGlow.addColorStop(0, `rgba(${parseInt(color.slice(1, 3), 16)}, ${parseInt(color.slice(3, 5), 16)}, ${parseInt(color.slice(5, 7), 16)}, 0.6)`)
+  outerGlow.addColorStop(0.5, `rgba(${parseInt(color.slice(1, 3), 16)}, ${parseInt(color.slice(3, 5), 16)}, ${parseInt(color.slice(5, 7), 16)}, 0.2)`)
+  outerGlow.addColorStop(1, `rgba(${parseInt(color.slice(1, 3), 16)}, ${parseInt(color.slice(3, 5), 16)}, ${parseInt(color.slice(5, 7), 16)}, 0)`)
+  ctx.fillStyle = outerGlow
+  ctx.fillRect(0, 0, 128, 128)
 
-  // bright core
-  const core = context.createRadialGradient(32, 32, 0, 32, 32, 10)
+  const core = ctx.createRadialGradient(64, 64, 0, 64, 64, 16)
   core.addColorStop(0, 'rgba(255, 255, 255, 1)')
-  core.addColorStop(0.3, 'rgba(0, 255, 65, 1)')
-  core.addColorStop(0.7, 'rgba(0, 255, 65, 0.4)')
-  core.addColorStop(1, 'rgba(0, 255, 65, 0)')
-  context.fillStyle = core
-  context.beginPath()
-  context.arc(32, 32, 10, 0, Math.PI * 2)
-  context.fill()
+  core.addColorStop(0.5, rgbaColor)
+  core.addColorStop(1, `rgba(${parseInt(color.slice(1, 3), 16)}, ${parseInt(color.slice(3, 5), 16)}, ${parseInt(color.slice(5, 7), 16)}, 0)`)
+  ctx.fillStyle = core
+  ctx.beginPath()
+  ctx.arc(64, 64, 16, 0, Math.PI * 2)
+  ctx.fill()
 
   const texture = new THREE.CanvasTexture(canvas)
   texture.colorSpace = THREE.SRGBColorSpace
@@ -444,124 +443,6 @@ function computeOrbitRingSegments(satelliteData: GlobeSatellite, samples = 120) 
   return segments
 }
 
-function PassesPanel({ satellites, onSelectSatellite }: { satellites: GlobeSatellite[]; onSelectSatellite: (s: SatellitePosition) => void }) {
-  const { showPassesPanel, setShowPassesPanel } = useContext(UIContext)
-  const [loading, setLoading] = useState(false)
-  const [usesDefault, setUsesDefault] = useState(false)
-  const [location, setLocation] = useState<{ lat: number; lon: number } | null>(null)
-  const [passes, setPasses] = useState<{ sat: GlobeSatellite; time: Date }[]>([])
-  const [now, setNow] = useState(new Date())
-  const panelRef = useRef<HTMLDivElement | null>(null)
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000)
-    return () => clearInterval(id)
-  }, [])
-
-  const computePasses = useCallback((lat: number, lon: number) => {
-    setLoading(true)
-    const results: { sat: GlobeSatellite; time: Date }[] = []
-    let index = 0
-
-    function processChunk() {
-      const chunkSize = 4
-      for (let i = 0; i < chunkSize && index < satellites.length; i += 1, index += 1) {
-        const sat = satellites[index]
-        if (!sat.satrec) continue
-        const nowDate = new Date()
-        let found: Date | null = null
-        for (let m = 0; m <= 120; m += 1) {
-          const date = new Date(nowDate.getTime() + m * 60_000)
-          const state = satellite.propagate(sat.satrec, date)
-          if (!state) continue
-          const positionEci = state.position as satellite.EciVec3<number> | boolean
-          if (!positionEci || typeof positionEci === 'boolean') continue
-          const gmst = satellite.gstime(date)
-          const positionGd = satellite.eciToGeodetic(positionEci, gmst)
-          const latP = satellite.degreesLat(positionGd.latitude)
-          const lonP = satellite.degreesLong(positionGd.longitude)
-          if (haversineDistanceKm(latP, lonP, lat, lon) < 2000) {
-            found = date
-            break
-          }
-        }
-        if (found) results.push({ sat, time: found })
-      }
-
-      if (index < satellites.length) {
-        setTimeout(processChunk, 10)
-      } else {
-        results.sort((a, b) => a.time.getTime() - b.time.getTime())
-        setPasses(results.slice(0, 6))
-        setLoading(false)
-      }
-    }
-
-    processChunk()
-  }, [satellites])
-
-  // Trigger compute when panel is opened
-  useEffect(() => {
-    if (!showPassesPanel) return
-    setPasses([])
-    setUsesDefault(false)
-    if (!navigator.geolocation) {
-      setUsesDefault(true)
-      setLocation({ lat: 28.6139, lon: 77.2090 })
-      computePasses(28.6139, 77.2090)
-      return
-    }
-    setLoading(true)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const lat = pos.coords.latitude
-        const lon = pos.coords.longitude
-        setLocation({ lat, lon })
-        computePasses(lat, lon)
-      },
-      () => {
-        setUsesDefault(true)
-        setLocation({ lat: 28.6139, lon: 77.2090 })
-        computePasses(28.6139, 77.2090)
-      },
-      { timeout: 8000 }
-    )
-  }, [showPassesPanel, computePasses])
-
-  // Close when clicking outside
-  useEffect(() => {
-    function onDocClick(e: MouseEvent) {
-      if (!showPassesPanel) return
-      if (!panelRef.current) return
-      if (!(e.target instanceof Node)) return
-      if (!panelRef.current.contains(e.target)) setShowPassesPanel(false)
-    }
-    document.addEventListener('mousedown', onDocClick)
-    return () => document.removeEventListener('mousedown', onDocClick)
-  }, [showPassesPanel, setShowPassesPanel])
-
-  if (!showPassesPanel) return null
-
-  return (
-    <div ref={panelRef} className="absolute left-3 top-14 z-50 w-72 rounded border border-green-500/40 bg-black/90 p-3 text-xs text-green-200 shadow-[0_0_18px_rgba(0,255,65,0.12)]">
-      <div className="font-black uppercase text-sm mb-1">📡 PASSES OVER YOUR SKY</div>
-      <div className="text-[11px] text-green-600 mb-2">{location ? `📍 ${location.lat.toFixed(4)}°N, ${location.lon.toFixed(4)}°E` : (usesDefault ? 'USING DEFAULT: NEW DELHI' : 'DETERMINING LOCATION...')}</div>
-      {loading && <div className="text-green-600">Calculating passes...</div>}
-      {!loading && passes.length === 0 && <div className="text-green-600">No passes found in next 2 hours.</div>}
-      {!loading && passes.length > 0 && (
-        <div className="space-y-1">
-          {passes.map(({ sat, time }) => (
-            <button key={sat.id} onClick={() => { onSelectSatellite(sat); setShowPassesPanel(false) }} className="flex w-full items-center justify-between rounded px-2 py-1 hover:bg-black/70">
-              <span className="truncate text-sm font-bold text-green-100">{sat.name}</span>
-              <span className="text-[11px] text-green-300">in {formatDuration(Math.max(0, Math.floor((time.getTime() - now.getTime()) / 1000)))}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 function ScreenshotRegistrar({ register }: { register: (canvas: HTMLCanvasElement) => void }) {
   const { gl } = useThree()
 
@@ -729,16 +610,19 @@ function SatelliteSprites({
   const labelRefs = useRef<(THREE.Sprite | null)[]>([])
   const latestSelectedRef = useRef<SatellitePosition | null>(null)
   const elapsedRef = useRef(0)
-  const dotTexture = useMemo(() => createGlowDotTexture(), [])
+  const dotTextures = useMemo(
+    () => satellites.map((sat) => createDotTexture(getTypeColor(sat.type))),
+    [satellites]
+  )
   const satelliteIconTexture = useMemo(() => createSatelliteIconTexture(), [])
   const issLabelTexture = useMemo(() => createTextTexture('ISS', '#ffd86b'), [])
 
   const dotMaterials = useMemo(
     () =>
-      satellites.map((sat) =>
+      satellites.map((sat, index) =>
         new THREE.SpriteMaterial({
-          map: dotTexture ?? undefined,
-          color: /ISS/i.test(sat.name) ? '#ffd86b' : getTypeColor(sat.type),
+          map: dotTextures[index] ?? undefined,
+          color: '#ffffff',
           transparent: true,
           blending: THREE.AdditiveBlending,
           depthWrite: false,
@@ -747,7 +631,7 @@ function SatelliteSprites({
           opacity: highlightedIds.size === 0 || highlightedIds.has(sat.id) ? 1 : 0.2
         })
       ),
-    [satellites, dotTexture, highlightedIds]
+    [satellites, dotTextures, highlightedIds]
   )
 
   const iconMaterials = useMemo(
@@ -782,14 +666,14 @@ function SatelliteSprites({
 
   useEffect(
     () => () => {
-      dotTexture?.dispose()
+      dotTextures.forEach((texture) => texture?.dispose())
       satelliteIconTexture?.dispose()
       issLabelTexture?.dispose()
       dotMaterials.forEach((material) => material.dispose())
       iconMaterials.forEach((material) => material.dispose())
       issLabelMaterial.dispose()
     },
-    [dotMaterials, dotTexture, iconMaterials, issLabelTexture, issLabelMaterial, satelliteIconTexture]
+    [dotMaterials, dotTextures, iconMaterials, issLabelTexture, issLabelMaterial, satelliteIconTexture]
   )
 
   useFrame(({ clock }) => {
@@ -817,11 +701,15 @@ function SatelliteSprites({
         const vec = latLngToVector3(lat, lon, altitudeToVisualRadius(alt))
         const isSelected = sat.id === selectedId
         const isISS = /ISS/i.test(sat.name)
-        const baseScale = isISS ? 0.15 : 0.1
-        const selectedScale = isISS ? 0.22 : 0.18
+        const baseScale = isISS ? 0.22 : 0.18
+        const selectedScale = isISS ? 0.32 : 0.26
         const material = isSelected ? iconMaterials[index] : dotMaterials[index]
+        const spriteVisible = vec.length() <= EARTH_RADIUS + 0.5
 
         sprite.position.set(vec.x, vec.y, vec.z)
+        sprite.visible = spriteVisible
+        if (!spriteVisible) return
+
         if (sprite.material !== material) {
           sprite.material = material
           sprite.material.needsUpdate = true
@@ -868,11 +756,12 @@ function SatelliteSprites({
                 spriteRefs.current[index] = sprite
               }}
               position={position}
-              scale={isSelected ? [isISS ? 0.22 : 0.18, isISS ? 0.22 : 0.18, isISS ? 0.22 : 0.18] : [isISS ? 0.15 : 0.1, isISS ? 0.15 : 0.1, isISS ? 0.15 : 0.1]}
+              scale={isSelected ? [isISS ? 0.22 : 0.18, isISS ? 0.22 : 0.18, isISS ? 0.22 : 0.18] : [isISS ? 0.15 : 0.12, isISS ? 0.15 : 0.12, isISS ? 0.15 : 0.12]}
               material={isSelected ? iconMaterials[index] : dotMaterials[index]}
               renderOrder={1}
               onClick={(event) => {
                 event.stopPropagation()
+                if (position.length() > EARTH_RADIUS + 0.3) return
                 onSelect(sat)
               }}
             />
@@ -1146,7 +1035,7 @@ export default function Globe3D() {
   const [computedTracks, setComputedTracks] = useState<Tracks | null>(null)
   const [dataSource, setDataSource] = useState<TLEDataSource>('fallback')
   const [isInitializing, setIsInitializing] = useState(true)
-  const { searchQuery, setTotalSatellites, setMatchCount, registerCanvas, onSearchSubmit } = useContext(UIContext)
+  const { searchQuery, setTotalSatellites, setMatchCount, registerCanvas, onSearchSubmit, onSatelliteSelect } = useContext(UIContext)
   const [isLegendOpen, setIsLegendOpen] = useState(false)
   const [nextPassDate, setNextPassDate] = useState<Date | null>(null)
   const [lastPassSatId, setLastPassSatId] = useState<number | null>(null)
@@ -1332,6 +1221,15 @@ export default function Globe3D() {
     return () => unsubscribe()
   }, [onSearchSubmit, satellites, handleSelectSatellite])
 
+  useEffect(() => {
+    if (!onSatelliteSelect) return
+    const unsubscribe = onSatelliteSelect((satellite: SatellitePosition) => {
+      if (!satellite) return
+      handleSelectSatellite(satellite)
+    })
+    return () => unsubscribe()
+  }, [onSatelliteSelect, handleSelectSatellite])
+
   return (
     <main className="relative h-[calc(100vh-3.5rem)] overflow-hidden bg-[#0a0a0a] font-mono text-green-400 scanlines">
       <Canvas
@@ -1422,9 +1320,6 @@ export default function Globe3D() {
           )}
         </div>
       </div>
-
-      {/* Passes panel (dropdown from navbar) */}
-      <PassesPanel satellites={satellites} onSelectSatellite={(sat) => handleSelectSatellite(sat)} />
 
       {selectedSatellite && (
         <aside className="terminal-panel absolute bottom-3 left-3 right-3 max-w-md bg-black/90 p-4 text-sm shadow-[0_0_28px_rgba(0,255,65,0.20)] sm:bottom-4 sm:left-4 sm:right-auto">

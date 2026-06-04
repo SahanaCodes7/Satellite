@@ -682,7 +682,7 @@ function createSatelliteRecord(data: TLEData): satellite.SatRec {
   return satellite.twoline2satrec(data.tle1, data.tle2)
 }
 
-function getSatelliteRecord(noradId: number): satellite.SatRec | null {
+export function getSatelliteRecord(noradId: number): satellite.SatRec | null {
   const data = SATELLITE_TLE_DATA[noradId]
   if (!data) return null
 
@@ -715,6 +715,18 @@ function propagateSatellite(satrec: satellite.SatRec, date: Date): PropagatedSta
   const velocityEci = positionAndVelocity.velocity as satellite.EciVec3<number> | boolean
 
   if (!positionEci || typeof positionEci === 'boolean' || !velocityEci || typeof velocityEci === 'boolean') {
+    return null
+  }
+
+  const eciDistance = Math.sqrt(
+    positionEci.x * positionEci.x +
+    positionEci.y * positionEci.y +
+    positionEci.z * positionEci.z
+  )
+
+  // Valid satellites are between 150km and 60000km altitude above Earth
+  // Earth radius = 6371km, so total distance from center should be within [6521, 66371]
+  if (eciDistance < 6521 || eciDistance > 66371) {
     return null
   }
 
