@@ -1,5 +1,5 @@
-import { useContext, useEffect, useMemo, useState } from 'react'
-import { Home, Map, Menu, X, Globe2, Camera, Radio } from 'lucide-react'
+import { useContext, useEffect, useMemo, useRef, useState } from 'react'
+import { Home, Menu, X, Radio, Search, Satellite } from 'lucide-react'
 import { Link, NavLink } from 'react-router-dom'
 import { UIContext } from '../contexts/UIContext'
 import { useSkyPasses, type SkyPassSatellite } from '../hooks/useSkyPasses'
@@ -16,6 +16,10 @@ const navLinkClass = ({ isActive }: { isActive: boolean }) =>
 export default function NavBar() {
   const [isOpen, setIsOpen] = useState(false)
   const [isFocused, setIsFocused] = useState(false)
+  const [highlightIndex, setHighlightIndex] = useState(-1)
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const suggestionsRef = useRef<HTMLDivElement>(null)
   const [location, setLocation] = useState<{ lat: number; lon: number } | null>(null)
   const [usesDefaultLocation, setUsesDefaultLocation] = useState(false)
   const [locationMessage, setLocationMessage] = useState('DETERMINING LOCATION...')
@@ -25,7 +29,6 @@ export default function NavBar() {
     setSearchQuery,
     totalSatellites,
     emitSearchSubmit,
-    takeScreenshot,
     showPassesPanel,
     setShowPassesPanel,
     emitSatelliteSelect
@@ -42,10 +45,29 @@ export default function NavBar() {
     [totalSatellites]
   )
 
-  const satelliteNames = useMemo(
-    () => Array.from(new Set(getSatelliteList().map(({ name }) => name))).sort((a, b) => a.localeCompare(b)),
-    []
+
+
+
+  const allSatelliteEntries = useMemo(
+    () => getSatelliteList().sort((a, b) => a.name.localeCompare(b.name)),
+    [totalSatellites]
   )
+
+  const filteredSuggestions = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) return []
+    return allSatelliteEntries
+      .filter(
+        (sat) =>
+          sat.name.toLowerCase().includes(query) ||
+          sat.type.toLowerCase().includes(query)
+      )
+      .slice(0, 12)
+  }, [searchQuery, allSatelliteEntries])
+
+  useEffect(() => {
+    setHighlightIndex(-1)
+  }, [filteredSuggestions])
 
   const { passes, loading } = useSkyPasses(location, satelliteEntries)
 
@@ -113,53 +135,145 @@ export default function NavBar() {
 
         <div className="hidden items-center gap-3 sm:flex">
           <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#00ff41]/60" />
             <input
+              ref={inputRef}
               value={searchQuery}
-              list="satellite-autosuggest"
               autoComplete="off"
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') emitSearchSubmit(searchQuery)
-                if (e.key === 'Escape') setSearchQuery('')
+              onChange={(e) => {
+                setSearchQuery(e.target.value)
+                setShowSuggestions(true)
               }}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault()
+                  setShowSuggestions(true)
+                  setHighlightIndex((prev) =>
+                    prev < filteredSuggestions.length - 1 ? prev + 1 : 0
+                  )
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault()
+                  setShowSuggestions(true)
+                  setHighlightIndex((prev) =>
+                    prev > 0 ? prev - 1 : filteredSuggestions.length - 1
+                  )
+                } else if (e.key === 'Enter') {
+                  e.preventDefault()
+                  if (highlightIndex >= 0 && highlightIndex < filteredSuggestions.length) {
+                    const sat = filteredSuggestions[highlightIndex]
+                    setSearchQuery(sat.name)
+                    emitSearchSubmit(sat.name)
+                    setShowSuggestions(false)
+                  } else {
+                    emitSearchSubmit(searchQuery)
+                    setShowSuggestions(false)
+                  }
+                } else if (e.key === 'Escape') {
+                  setSearchQuery('')
+                  setShowSuggestions(false)
+                }
+              }}
+              onFocus={() => {
+                setIsFocused(true)
+                if (searchQuery.trim()) setShowSuggestions(true)
+              }}
+              onBlur={() => {
+                setIsFocused(false)
+                // Delay hiding so click events on suggestions can fire
+                setTimeout(() => setShowSuggestions(false), 200)
+              }}
               placeholder="SEARCH SATELLITE..."
               style={{ color: '#00ff41', backgroundColor: '#0a0a0a' }}
-              className={`h-10 min-w-[300px] ${isFocused ? 'w-[380px]' : ''} transition-all rounded border border-[#00ff41] bg-[#0a0a0a] px-3 py-2 font-mono text-sm text-[#00ff41] placeholder:text-[#00ff41]/50 outline-none focus:border-[#00ff41] focus:shadow-[0_0_8px_rgba(0,255,65,0.4)]`}
+              className={`h-10 min-w-[300px] ${isFocused ? 'w-[380px]' : ''} transition-all rounded border border-[#00ff41]/70 bg-[#0a0a0a] pl-9 pr-9 py-2 font-mono text-sm text-[#00ff41] placeholder:text-[#00ff41]/40 outline-none focus:border-[#00ff41] focus:shadow-[0_0_12px_rgba(0,255,65,0.35)]`}
             />
-            <datalist id="satellite-autosuggest">
-              {satelliteNames.map((name) => (
-                <option key={name} value={name} />
-              ))}
-            </datalist>
+
             {searchQuery.length > 0 && (
               <button
                 type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-green-300"
+                onClick={() => {
+                  setSearchQuery('')
+                  setShowSuggestions(false)
+                  inputRef.current?.focus()
+                }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-green-500 hover:text-green-300 transition-colors"
                 aria-label="Clear search"
               >
-                X
+                <X className="h-4 w-4" />
               </button>
+            )}
+
+            {/* Custom auto-suggest dropdown */}
+            {showSuggestions && filteredSuggestions.length > 0 && (
+              <div
+                ref={suggestionsRef}
+                className="sat-suggest-dropdown absolute left-0 top-[calc(100%+6px)] z-[3000] w-full min-w-[380px] overflow-hidden rounded border border-[#00ff41]/40 bg-[#070a07]/98 shadow-[0_4px_32px_rgba(0,255,65,0.18),0_0_1px_rgba(0,255,65,0.5)] backdrop-blur-md"
+              >
+                <div className="border-b border-[#00ff41]/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest text-[#00ff41]/50">
+                  <span className="flex items-center gap-1.5">
+                    <Satellite className="h-3 w-3" />
+                    {filteredSuggestions.length} MATCH{filteredSuggestions.length !== 1 ? 'ES' : ''} FOUND
+                  </span>
+                </div>
+                <div className="max-h-[340px] overflow-y-auto custom-scrollbar">
+                  {filteredSuggestions.map((sat, idx) => {
+                    const query = searchQuery.trim().toLowerCase()
+                    const nameIdx = sat.name.toLowerCase().indexOf(query)
+                    return (
+                      <button
+                        key={sat.noradId}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          setSearchQuery(sat.name)
+                          emitSearchSubmit(sat.name)
+                          setShowSuggestions(false)
+                          inputRef.current?.blur()
+                        }}
+                        onMouseEnter={() => setHighlightIndex(idx)}
+                        className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-all ${
+                          idx === highlightIndex
+                            ? 'bg-[#00ff41]/12 text-[#00ff41]'
+                            : 'text-green-300/80 hover:bg-[#00ff41]/6'
+                        }`}
+                      >
+                        <span
+                          className={`h-2 w-2 shrink-0 rounded-full ${
+                            idx === highlightIndex
+                              ? 'bg-[#00ff41] shadow-[0_0_8px_#00ff41]'
+                              : 'bg-green-600/60'
+                          }`}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-bold">
+                            {nameIdx >= 0 ? (
+                              <>
+                                {sat.name.slice(0, nameIdx)}
+                                <span className="text-[#00ff41] underline underline-offset-2 decoration-[#00ff41]/50">
+                                  {sat.name.slice(nameIdx, nameIdx + query.length)}
+                                </span>
+                                {sat.name.slice(nameIdx + query.length)}
+                              </>
+                            ) : (
+                              sat.name
+                            )}
+                          </span>
+                          <span className="block truncate text-[10px] uppercase tracking-wider text-green-700">
+                            {sat.type} &middot; NORAD {sat.noradId}
+                          </span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={() => takeScreenshot()}
-            className="flex h-10 items-center gap-2 rounded border border-green-900/60 bg-black/50 px-3 text-xs font-black tracking-wider text-green-300 hover:border-green-500"
-            title="Take screenshot"
-          >
-            <Camera className="h-4 w-4" />
-          </button>
 
           <NavLink to="/" end className={navLinkClass}>
-            <Map className="h-4 w-4" />
             <span>2D MAP</span>
           </NavLink>
           <NavLink to="/globe" className={navLinkClass}>
-            <Globe2 className="h-4 w-4" />
             <span>3D GLOBE</span>
           </NavLink>
         </div>
@@ -214,11 +328,9 @@ export default function NavBar() {
       {isOpen && (
         <nav className="grid gap-2 border-t border-green-900/60 bg-black/95 p-3 sm:hidden">
           <NavLink to="/" end className={navLinkClass} onClick={closeMenu}>
-            <Map className="h-4 w-4" />
             <span>2D MAP</span>
           </NavLink>
           <NavLink to="/globe" className={navLinkClass} onClick={closeMenu}>
-            <Globe2 className="h-4 w-4" />
             <span>3D GLOBE</span>
           </NavLink>
         </nav>

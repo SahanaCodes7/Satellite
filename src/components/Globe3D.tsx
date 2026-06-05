@@ -501,17 +501,6 @@ function computeOrbitRingSegments(satelliteData: GlobeSatellite, samples = 120) 
   return segments
 }
 
-function ScreenshotRegistrar({ register }: { register: (canvas: HTMLCanvasElement) => void }) {
-  const { gl } = useThree()
-
-  useEffect(() => {
-    if (gl.domElement instanceof HTMLCanvasElement) {
-      register(gl.domElement)
-    }
-  }, [gl, register])
-
-  return null
-}
 
 function Earth() {
   const { texture: dayTexture, failed: dayTextureFailed } = useSafeTexture(EARTH_DAY_TEXTURE_URL)
@@ -760,9 +749,9 @@ function SatelliteSprites({
         const lat = satellite.degreesLat(positionGd.latitude)
         const lon = satellite.degreesLong(positionGd.longitude)
         const alt = positionGd.height
-        const vec = latLngToVector3(lat, lon, EARTH_RADIUS + 0.05)
+        const vec = latLngToVector3(lat, lon, altitudeToVisualRadius(alt))
         const distFromCenter = vec.length()
-        if (distFromCenter > EARTH_RADIUS * 1.5 || distFromCenter < EARTH_RADIUS * 0.5) {
+        if (distFromCenter > EARTH_RADIUS * 12 || distFromCenter < EARTH_RADIUS * 0.5) {
           sprite.visible = false
           if (labelSprite) labelSprite.visible = false
           return
@@ -830,7 +819,7 @@ function SatelliteSprites({
               onClick={(event) => {
                 event.stopPropagation()
                 const sprite = spriteRefs.current[index]
-                if (!sprite || sprite.position.length() > EARTH_RADIUS * 1.2) return
+                if (!sprite || sprite.position.length() > EARTH_RADIUS * 12) return
                 onSelect(sat)
               }}
             />
@@ -1027,22 +1016,6 @@ function SelectedOrbitRing({ selectedSatellite }: { selectedSatellite: Satellite
   )
 }
 
-function pushGroundTrackPoint(
-  segments: THREE.Vector3[][],
-  currentSegment: THREE.Vector3[],
-  previousLongitude: number | null,
-  latitude: number,
-  longitude: number
-) {
-  // break segment when longitude jump is large (anti-meridian handling)
-  if (previousLongitude !== null && Math.abs(longitude - previousLongitude) > 150) {
-    if (currentSegment.length > 1) segments.push([...currentSegment])
-    currentSegment.length = 0
-  }
-
-  currentSegment.push(latLngToVector3(latitude, longitude, GROUND_TRACK_RADIUS))
-}
-
 type Tracks = {
   orbitPast: THREE.Vector3[]
   orbitFuture: THREE.Vector3[]
@@ -1056,12 +1029,6 @@ function calculateTracksForSatellite(selectedSatellite: SatellitePosition | null
 
   const orbitPast: THREE.Vector3[] = []
   const orbitFuture: THREE.Vector3[] = []
-  const groundPast: THREE.Vector3[][] = []
-  const groundFuture: THREE.Vector3[][] = []
-  const groundPastSegment: THREE.Vector3[] = []
-  const groundFutureSegment: THREE.Vector3[] = []
-  let previousPastLongitude: number | null = null
-  let previousFutureLongitude: number | null = null
   const satrec = (selectedSatellite as GlobeSatellite).satrec
   const orbitalPeriodMinutes = Number.isFinite(satrec?.no) && satrec.no > 0
     ? Math.min((2 * Math.PI) / satrec.no, 24 * 60)
@@ -1070,57 +1037,50 @@ function calculateTracksForSatellite(selectedSatellite: SatellitePosition | null
   const stepMinutes = orbitalPeriodMinutes / (sampleCount - 1)
   const startOffsetMinutes = -orbitalPeriodMinutes / 2
 
-  // Use satellite.propagate to compute actual geodetic subpoint per sample synchronously
+  // Use a fixed GMST at the current epoch so the orbit ring is computed in a
+  // consistent Earth-fixed frame. This produces a clean circular/elliptical
+  // orbit for ALL satellites, including GEO/GSO (no figure-8 artefact).
+  const epochGmst = satellite.gstime(new Date(nowMs))
+  const scale = EARTH_RADIUS / EARTH_RADIUS_KM
+
   for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex += 1) {
     const minute = startOffsetMinutes + stepMinutes * sampleIndex
     const date = new Date(nowMs + minute * 60 * 1000)
-    // prefer satrec if available
-    let lat: number | null = null
-    let lon: number | null = null
-    let alt: number | null = null
+
     if (satrec) {
       try {
         const state = satellite.propagate(satrec, date)
         if (!state) continue
         const positionEci = state.position as satellite.EciVec3<number> | boolean
         if (!positionEci || typeof positionEci === 'boolean') continue
-        const gmst = satellite.gstime(date)
-        const positionGd = satellite.eciToGeodetic(positionEci, gmst)
-        lat = satellite.degreesLat(positionGd.latitude)
-        lon = satellite.degreesLong(positionGd.longitude)
-        alt = positionGd.height
-      } catch {
-        // fallback to calculateSatellitePosition if propagate fails
-      }
-    }
 
-    // fallback path
-    if (lat === null || lon === null) {
+        const positionGd = satellite.eciToGeodetic(positionEci, epochGmst)
+        const positionEcf = satellite.eciToEcf(positionEci, epochGmst)
+        const orbitPoint = ecfToVector3(positionEcf, scale).setLength(
+          altitudeToVisualRadius(positionGd.height)
+        )
+
+        if (minute <= 0) orbitPast.push(orbitPoint)
+        if (minute >= 0) orbitFuture.push(orbitPoint)
+      } catch {
+        // skip bad samples
+      }
+    } else {
+      // Fallback: use lat/lng when satrec is unavailable
       const sample = calculateSatellitePosition(selectedSatellite.noradId, date)
       if (!sample) continue
-      lat = sample.latitude
-      lon = sample.longitude
-      alt = sample.altitude
-    }
-
-    const orbitPoint = latLngToVector3(lat, lon, altitudeToVisualRadius(alt ?? selectedSatellite.altitude))
-
-    if (minute <= 0) {
-      orbitPast.push(orbitPoint)
-      pushGroundTrackPoint(groundPast, groundPastSegment, previousPastLongitude, lat, lon)
-      previousPastLongitude = lon
-    }
-    if (minute >= 0) {
-      orbitFuture.push(orbitPoint)
-      pushGroundTrackPoint(groundFuture, groundFutureSegment, previousFutureLongitude, lat, lon)
-      previousFutureLongitude = lon
+      const orbitPoint = latLngToVector3(
+        sample.latitude,
+        sample.longitude,
+        altitudeToVisualRadius(sample.altitude)
+      )
+      if (minute <= 0) orbitPast.push(orbitPoint)
+      if (minute >= 0) orbitFuture.push(orbitPoint)
     }
   }
 
-  if (groundPastSegment.length > 1) groundPast.push(groundPastSegment)
-  if (groundFutureSegment.length > 1) groundFuture.push(groundFutureSegment)
-
-  return { orbitPast, orbitFuture, groundPast, groundFuture }
+  // Ground track arrays are kept empty — no surface projection on the 3D globe
+  return { orbitPast, orbitFuture, groundPast: [], groundFuture: [] }
 }
 
 function SelectedTracks({ selectedSatellite, now, externalTracks }: { selectedSatellite: SatellitePosition | null; now: Date; externalTracks?: Tracks | null }) {
@@ -1128,8 +1088,13 @@ function SelectedTracks({ selectedSatellite, now, externalTracks }: { selectedSa
   if (externalTracks) {
     return (
       <>
-        <DynamicLineSegments segments={externalTracks.groundPast} color="#ffaa00" opacity={0.7} />
-        <DynamicLineSegments segments={externalTracks.groundFuture} color="#00ffff" opacity={0.5} dashed={true} />
+        {/* Orbit path at actual altitude */}
+        {externalTracks.orbitPast.length > 1 && (
+          <DynamicLine points={externalTracks.orbitPast} color="#ffaa00" opacity={0.55} />
+        )}
+        {externalTracks.orbitFuture.length > 1 && (
+          <DynamicLine points={externalTracks.orbitFuture} color="#00ffff" opacity={0.4} dashed />
+        )}
         <SelectionConnectorLine selectedSatellite={selectedSatellite} />
       </>
     )
@@ -1156,8 +1121,13 @@ function SelectedTracks({ selectedSatellite, now, externalTracks }: { selectedSa
 
   return (
     <>
-      <DynamicLineSegments segments={tracks.groundPast} color="#ffaa00" opacity={0.7} />
-      <DynamicLineSegments segments={tracks.groundFuture} color="#00ffff" opacity={0.5} dashed={true} />
+      {/* Orbit path at actual altitude */}
+      {tracks.orbitPast.length > 1 && (
+        <DynamicLine points={tracks.orbitPast} color="#ffaa00" opacity={0.55} />
+      )}
+      {tracks.orbitFuture.length > 1 && (
+        <DynamicLine points={tracks.orbitFuture} color="#00ffff" opacity={0.4} dashed />
+      )}
       <SelectionConnectorLine selectedSatellite={selectedSatellite} />
     </>
   )
@@ -1187,11 +1157,11 @@ export default function Globe3D() {
   const [computedTracks, setComputedTracks] = useState<Tracks | null>(null)
   const [dataSource, setDataSource] = useState<TLEDataSource>('fallback')
   const [isInitializing, setIsInitializing] = useState(true)
-  const { searchQuery, setTotalSatellites, setMatchCount, registerCanvas, onSearchSubmit, onSatelliteSelect } = useContext(UIContext)
+  const { searchQuery, setTotalSatellites, setMatchCount, onSearchSubmit, onSatelliteSelect } = useContext(UIContext)
   const [isLegendOpen, setIsLegendOpen] = useState(false)
   const [nextPassDate, setNextPassDate] = useState<Date | null>(null)
   const [lastPassSatId, setLastPassSatId] = useState<number | null>(null)
-  // canvas element is registered via UIContext.registerCanvas
+
   const selectedIdRef = useRef<number | null>(null)
   const latestSelectedPositionRef = useRef<SatellitePosition | null>(null)
   const lastTracksForIdRef = useRef<number | null>(null)
@@ -1444,7 +1414,7 @@ export default function Globe3D() {
           onSelectedFrame={handleSelectedFrame}
           highlightedIds={highlightedIds}
         />
-        <ScreenshotRegistrar register={registerCanvas} />
+
         {/* No HTML labels on the globe per spec */}
         <OrbitControls
           ref={orbitControlsRef}
@@ -1471,7 +1441,7 @@ export default function Globe3D() {
         </div>
       </div>
 
-      {/* Screenshot is now handled by NavBar via UIContext */}
+
 
       {/* Search moved to NavBar */}
 

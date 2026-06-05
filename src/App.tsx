@@ -483,38 +483,46 @@ function SatelliteTracker() {
                 </div>
 
                 {/* Telemetry Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <div className="bg-black/20 p-4 rounded border border-green-900/30">
-                    <div className="text-xs text-green-600 mb-1">NORAD ID</div>
-                    <div className="text-lg font-bold">{selectedSatellite.noradId}</div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-black/20 p-3 rounded border border-green-900/30">
+                    <div className="text-[10px] tracking-widest text-green-600 mb-1">NORAD ID</div>
+                    <div className="text-base font-bold text-green-300">{selectedSatellite.noradId}</div>
                   </div>
-                  <div className="bg-black/20 p-4 rounded border border-green-900/30">
-                    <div className="text-xs text-green-600 mb-1">LAUNCH DATE</div>
-                    <div className="text-lg font-bold">{selectedSatellite.launchDate}</div>
+                  <div className="bg-black/20 p-3 rounded border border-green-900/30">
+                    <div className="text-[10px] tracking-widest text-green-600 mb-1">LAUNCH DATE</div>
+                    <div className="text-base font-bold text-green-300 whitespace-nowrap overflow-hidden text-ellipsis" title={selectedSatellite.launchDate}>
+                      {selectedSatellite.launchDate}
+                    </div>
                   </div>
-                  <div className="bg-black/20 p-4 rounded border border-green-900/30">
-                    <div className="text-xs text-green-600 mb-1">LATITUDE</div>
-                    <div className="text-lg font-bold">{selectedSatellite.latitude.toFixed(4)}°</div>
+                  <div className="bg-black/20 p-3 rounded border border-green-900/30">
+                    <div className="text-[10px] tracking-widest text-green-600 mb-1">LATITUDE</div>
+                    <div className="text-base font-bold text-green-300 whitespace-nowrap">
+                      {selectedSatellite.latitude.toFixed(4)}°
+                    </div>
                   </div>
-                  <div className="bg-black/20 p-4 rounded border border-green-900/30">
-                    <div className="text-xs text-green-600 mb-1">LONGITUDE</div>
-                    <div className="text-lg font-bold">{selectedSatellite.longitude.toFixed(4)}°</div>
+                  <div className="bg-black/20 p-3 rounded border border-green-900/30">
+                    <div className="text-[10px] tracking-widest text-green-600 mb-1">LONGITUDE</div>
+                    <div className="text-base font-bold text-green-300 whitespace-nowrap">
+                      {selectedSatellite.longitude.toFixed(4)}°
+                    </div>
                   </div>
-                  <div className="bg-black/20 p-4 rounded border border-green-900/30">
-                    <div className="text-xs text-green-600 mb-1">ALTITUDE</div>
-                    <div className="text-lg font-bold flex items-center gap-2">
-                      <Zap className="w-4 h-4" />
+                  <div className="bg-black/20 p-3 rounded border border-green-900/30">
+                    <div className="text-[10px] tracking-widest text-green-600 mb-1">ALTITUDE</div>
+                    <div className="text-base font-bold text-green-300 flex items-center gap-1.5 whitespace-nowrap">
+                      <Zap className="w-3.5 h-3.5" />
                       {selectedSatellite.altitude.toLocaleString()} km
                     </div>
                   </div>
-                  <div className="bg-black/20 p-4 rounded border border-green-900/30">
-                    <div className="text-xs text-green-600 mb-1">VELOCITY</div>
-                    <div className="text-lg font-bold">{selectedSatellite.velocity} km/s</div>
+                  <div className="bg-black/20 p-3 rounded border border-green-900/30">
+                    <div className="text-[10px] tracking-widest text-green-600 mb-1">VELOCITY</div>
+                    <div className="text-base font-bold text-green-300 whitespace-nowrap">
+                      {selectedSatellite.velocity} km/s
+                    </div>
                   </div>
-                  <div className="bg-black/20 p-4 rounded border border-green-900/30">
-                    <div className="text-xs text-green-600 mb-1">SIGNAL STRENGTH</div>
-                    <div className="text-lg font-bold flex items-center gap-2">
-                      <Signal className="w-4 h-4" />
+                  <div className="bg-black/20 p-3 rounded border border-green-900/30 col-span-2">
+                    <div className="text-[10px] tracking-widest text-green-600 mb-1">SIGNAL STRENGTH</div>
+                    <div className="text-base font-bold text-green-300 flex items-center gap-1.5">
+                      <Signal className="w-3.5 h-3.5" />
                       {selectedSatellite.signalStrength}%
                     </div>
                   </div>

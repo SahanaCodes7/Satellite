@@ -13,8 +13,7 @@ export const UIContext = createContext({
   emitSearchSubmit: (_q: string) => {},
   onSatelliteSelect: (_handler: (satellite: any) => void) => () => {},
   emitSatelliteSelect: (_satellite: any) => {},
-  registerCanvas: (_canvas: HTMLCanvasElement | null) => {},
-  takeScreenshot: () => {},
+
   showLegend: false,
   setShowLegend: (_v: boolean) => {},
   showPassesPanel: false,
@@ -25,7 +24,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [totalSatellites, setTotalSatellites] = useState(0)
   const [matchCount, setMatchCount] = useState(0)
-  const [canvasEl, setCanvasEl] = useState<HTMLCanvasElement | null>(null)
+
   const [showLegend, setShowLegend] = useState(false)
   const [showPassesPanel, setShowPassesPanel] = useState(false)
 
@@ -57,18 +56,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
     eventTarget.dispatchEvent(new CustomEvent('satelliteSelect', { detail: { satellite } }))
   }, [eventTarget])
 
-  const registerCanvas = useCallback((canvas: HTMLCanvasElement | null) => {
-    setCanvasEl(canvas)
-  }, [])
 
-  const takeScreenshot = useCallback(() => {
-    if (!canvasEl) return
-    const dataUrl = canvasEl.toDataURL('image/png')
-    const link = document.createElement('a')
-    link.href = dataUrl
-    link.download = `isro-satellite-${new Date().toISOString().replace(/[:.]/g, '-')}.png`
-    link.click()
-  }, [canvasEl])
 
   return (
     <UIContext.Provider
@@ -83,8 +71,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
         emitSearchSubmit,
         onSatelliteSelect,
         emitSatelliteSelect,
-        registerCanvas,
-        takeScreenshot,
+
         showLegend,
         setShowLegend,
         showPassesPanel,
