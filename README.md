@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # 🛰️ ISRO Satellite Tracker
 
 <div align="center">
