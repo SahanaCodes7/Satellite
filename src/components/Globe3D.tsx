@@ -4,7 +4,7 @@ import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 // Note: using basic THREE.Line for subtle ground tracks; no Line2 required
 import * as satellite from 'satellite.js'
-import { Activity, Database, Satellite as SatelliteIcon, Signal, Zap } from 'lucide-react'
+import { Activity, CircleDot, Database, MapPin, Satellite as SatelliteIcon, Zap } from 'lucide-react'
 import {
   calculateAllSatellitePositions,
   calculateSatellitePosition,
@@ -40,6 +40,8 @@ interface GlobeSatellite extends SatellitePosition {
   satrec: satellite.SatRec
 }
 
+type TrackDisplayMode = 'ground' | 'orbit'
+
 function altitudeToVisualRadius(altitudeKm: number) {
   const compressedAltitude = Math.min(Math.max(altitudeKm, 0), 43000)
   return EARTH_RADIUS + (compressedAltitude / EARTH_RADIUS_KM) * 0.78
@@ -61,6 +63,14 @@ function satelliteToVector3(satellitePosition: SatellitePosition) {
     satellitePosition.latitude,
     satellitePosition.longitude,
     altitudeToVisualRadius(satellitePosition.altitude)
+  )
+}
+
+function ecfToVector3(positionEcf: satellite.EcfVec3<number>, scale: number) {
+  return new THREE.Vector3(
+    positionEcf.x * scale,
+    positionEcf.z * scale,
+    -positionEcf.y * scale
   )
 }
 
@@ -406,6 +416,54 @@ function calculateNextIndiaPass(satelliteData: GlobeSatellite, from: Date) {
   return null
 }
 
+function calculateOrbit3D(satrec: satellite.SatRec) {
+  const points: THREE.Vector3[] = []
+  const now = new Date()
+  const epochGmst = satellite.gstime(now)
+  const periodMinutes = Number.isFinite(satrec.no) && satrec.no > 0 ? (2 * Math.PI) / satrec.no : 95
+  const steps = 200
+  const stepMinutes = periodMinutes / steps
+  const scale = EARTH_RADIUS / EARTH_RADIUS_KM
+
+  for (let index = 0; index <= steps; index += 1) {
+    const date = new Date(now.getTime() + index * stepMinutes * 60 * 1000)
+    try {
+      const state = satellite.propagate(satrec, date)
+      if (!state || typeof state.position !== 'object') continue
+
+      const positionEci = state.position as satellite.EciVec3<number>
+      const { x, y, z } = positionEci
+      if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) continue
+
+      const positionEcf = satellite.eciToEcf(positionEci, epochGmst)
+      const positionGd = satellite.eciToGeodetic(positionEci, epochGmst)
+      const point = ecfToVector3(positionEcf, scale).setLength(altitudeToVisualRadius(positionGd.height))
+      points.push(point)
+    } catch {
+      // Skip bad propagated samples; a partial ring is better than no overlay.
+    }
+  }
+
+  return points
+}
+
+function calculateOrbitPlane(points: THREE.Vector3[]) {
+  if (points.length < 3) return null
+
+  const first = points[0].clone().normalize()
+  const quarter = points[Math.floor(points.length / 4)]?.clone().normalize()
+  if (!quarter) return null
+
+  const normal = first.cross(quarter).normalize()
+  if (!Number.isFinite(normal.lengthSq()) || normal.lengthSq() < 0.0001) return null
+
+  const radius = points.reduce((maxRadius, point) => Math.max(maxRadius, point.length()), 0)
+  if (!Number.isFinite(radius) || radius <= 0) return null
+
+  const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal)
+  return { radius, quaternion }
+}
+
 function computeOrbitRingSegments(satelliteData: GlobeSatellite, samples = 120) {
   const segments: THREE.Vector3[][] = []
   if (!satelliteData.satrec) return segments
@@ -702,14 +760,21 @@ function SatelliteSprites({
         const lat = satellite.degreesLat(positionGd.latitude)
         const lon = satellite.degreesLong(positionGd.longitude)
         const alt = positionGd.height
-        const vec = latLngToVector3(lat, lon, altitudeToVisualRadius(alt))
+        const vec = latLngToVector3(lat, lon, EARTH_RADIUS + 0.05)
+        const distFromCenter = vec.length()
+        if (distFromCenter > EARTH_RADIUS * 1.5 || distFromCenter < EARTH_RADIUS * 0.5) {
+          sprite.visible = false
+          if (labelSprite) labelSprite.visible = false
+          return
+        }
+
         const isSelected = sat.id === selectedId
         const isISS = /ISS/i.test(sat.name)
         const baseScale = isISS ? 0.22 : 0.18
         const selectedScale = isISS ? 0.32 : 0.26
         const material = isSelected ? iconMaterials[index] : dotMaterials[index]
 
-        sprite.position.set(vec.x, vec.y, vec.z)
+        sprite.position.copy(vec)
         sprite.visible = true
 
         if (sprite.material !== material) {
@@ -723,6 +788,7 @@ function SatelliteSprites({
           const labelOffset = vec.clone().multiplyScalar(1.08)
           labelSprite.position.set(labelOffset.x, labelOffset.y, labelOffset.z)
           labelSprite.material.opacity = sprite.material.opacity
+          labelSprite.visible = true
         }
 
         const velocity = Math.sqrt(velocityEci.x ** 2 + velocityEci.y ** 2 + velocityEci.z ** 2)
@@ -763,6 +829,8 @@ function SatelliteSprites({
               renderOrder={1}
               onClick={(event) => {
                 event.stopPropagation()
+                const sprite = spriteRefs.current[index]
+                if (!sprite || sprite.position.length() > EARTH_RADIUS * 1.2) return
                 onSelect(sat)
               }}
             />
@@ -866,6 +934,19 @@ function DynamicLine({
     return createdLine
   }, [positions, color, opacity, dashed])
 
+  useEffect(
+    () => () => {
+      line.geometry.dispose()
+      const material = line.material
+      if (Array.isArray(material)) {
+        material.forEach((item) => item.dispose())
+      } else {
+        material.dispose()
+      }
+    },
+    [line]
+  )
+
   if (points.length < 2) return null
   return <primitive object={line} />
 }
@@ -915,6 +996,37 @@ function SelectionConnectorLine({ selectedSatellite }: { selectedSatellite: Sate
   return <DynamicLine points={points} color="#00ffff" opacity={0.85} dashed />
 }
 
+function SelectedOrbitRing({ selectedSatellite }: { selectedSatellite: SatellitePosition | null }) {
+  const satrec = (selectedSatellite as GlobeSatellite | null)?.satrec
+  const orbitPoints = useMemo(() => {
+    return satrec ? calculateOrbit3D(satrec) : []
+  }, [selectedSatellite?.id, satrec])
+
+  const orbitPlane = useMemo(() => calculateOrbitPlane(orbitPoints), [orbitPoints])
+
+  if (orbitPoints.length < 3) return null
+
+  return (
+    <>
+      {orbitPlane && (
+        <mesh quaternion={orbitPlane.quaternion} renderOrder={1}>
+          <circleGeometry args={[orbitPlane.radius, 64]} />
+          <meshBasicMaterial
+            color="#00ffff"
+            transparent
+            opacity={0.03}
+            side={THREE.DoubleSide}
+            depthWrite={false}
+            depthTest={true}
+          />
+        </mesh>
+      )}
+      <DynamicLine points={orbitPoints} color="#00ffff" opacity={0.8} />
+      <DynamicLine points={orbitPoints} color="#8fffff" opacity={0.22} />
+    </>
+  )
+}
+
 function pushGroundTrackPoint(
   segments: THREE.Vector3[][],
   currentSegment: THREE.Vector3[],
@@ -950,8 +1062,9 @@ function calculateTracksForSatellite(selectedSatellite: SatellitePosition | null
   const groundFutureSegment: THREE.Vector3[] = []
   let previousPastLongitude: number | null = null
   let previousFutureLongitude: number | null = null
-  const orbitalPeriodMinutes = Number.isFinite(selectedSatellite.satrec.no) && selectedSatellite.satrec.no > 0
-    ? Math.min((2 * Math.PI) / selectedSatellite.satrec.no, 24 * 60)
+  const satrec = (selectedSatellite as GlobeSatellite).satrec
+  const orbitalPeriodMinutes = Number.isFinite(satrec?.no) && satrec.no > 0
+    ? Math.min((2 * Math.PI) / satrec.no, 24 * 60)
     : 95
   const sampleCount = Math.max(121, Math.min(361, Math.round(orbitalPeriodMinutes * 2) + 1))
   const stepMinutes = orbitalPeriodMinutes / (sampleCount - 1)
@@ -965,9 +1078,9 @@ function calculateTracksForSatellite(selectedSatellite: SatellitePosition | null
     let lat: number | null = null
     let lon: number | null = null
     let alt: number | null = null
-    if ((selectedSatellite as any).satrec) {
+    if (satrec) {
       try {
-        const state = satellite.propagate((selectedSatellite as any).satrec as satellite.SatRec, date)
+        const state = satellite.propagate(satrec, date)
         if (!state) continue
         const positionEci = state.position as satellite.EciVec3<number> | boolean
         if (!positionEci || typeof positionEci === 'boolean') continue
@@ -1015,8 +1128,8 @@ function SelectedTracks({ selectedSatellite, now, externalTracks }: { selectedSa
   if (externalTracks) {
     return (
       <>
-        <DynamicLine points={externalTracks.orbitPast} color="#ffaa00" opacity={0.7} />
-        <DynamicLine points={externalTracks.orbitFuture} color="#00ffff" opacity={0.5} dashed={true} />
+        <DynamicLineSegments segments={externalTracks.groundPast} color="#ffaa00" opacity={0.7} />
+        <DynamicLineSegments segments={externalTracks.groundFuture} color="#00ffff" opacity={0.5} dashed={true} />
         <SelectionConnectorLine selectedSatellite={selectedSatellite} />
       </>
     )
@@ -1043,8 +1156,8 @@ function SelectedTracks({ selectedSatellite, now, externalTracks }: { selectedSa
 
   return (
     <>
-      <DynamicLine points={tracks.orbitPast} color="#ffaa00" opacity={0.7} />
-      <DynamicLine points={tracks.orbitFuture} color="#00ffff" opacity={0.5} dashed={true} />
+      <DynamicLineSegments segments={tracks.groundPast} color="#ffaa00" opacity={0.7} />
+      <DynamicLineSegments segments={tracks.groundFuture} color="#00ffff" opacity={0.5} dashed={true} />
       <SelectionConnectorLine selectedSatellite={selectedSatellite} />
     </>
   )
@@ -1069,6 +1182,7 @@ export default function Globe3D() {
   const [satellites, setSatellites] = useState<GlobeSatellite[]>([])
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [selectedSatellite, setSelectedSatellite] = useState<SatellitePosition | null>(null)
+  const [trackDisplayMode, setTrackDisplayMode] = useState<TrackDisplayMode>('ground')
   const [now, setNow] = useState(() => new Date())
   const [computedTracks, setComputedTracks] = useState<Tracks | null>(null)
   const [dataSource, setDataSource] = useState<TLEDataSource>('fallback')
@@ -1208,6 +1322,7 @@ export default function Globe3D() {
     setSelectedSatellite(null)
     latestSelectedPositionRef.current = null
     setComputedTracks(null)
+    setTrackDisplayMode('ground')
     setNextPassDate(null)
     setLastPassSatId(null)
   }, [])
@@ -1218,6 +1333,7 @@ export default function Globe3D() {
     setSelectedId(satellite.id)
     setSelectedSatellite(satellite)
     latestSelectedPositionRef.current = satellite
+    setTrackDisplayMode('ground')
 
     // Instantly hide any old tracks by clearing computedTracks
     setComputedTracks({ orbitPast: [], orbitFuture: [], groundPast: [], groundFuture: [] })
@@ -1313,8 +1429,12 @@ export default function Globe3D() {
         />
         <CameraDistanceTracker cameraDistanceRef={cameraDistanceRef} />
         <CountryBorders />
-        <SelectedTracks selectedSatellite={selectedSatellite} now={now} externalTracks={computedTracks} />
-        {issOrbitSegments.length > 0 && (
+        {trackDisplayMode === 'ground' ? (
+          <SelectedTracks selectedSatellite={selectedSatellite} now={now} externalTracks={computedTracks} />
+        ) : (
+          <SelectedOrbitRing selectedSatellite={selectedSatellite} />
+        )}
+        {trackDisplayMode === 'ground' && issOrbitSegments.length > 0 && (
           <DynamicLineSegments segments={issOrbitSegments} color="#ffd86b" opacity={0.4} />
         )}
         <SatelliteSprites
@@ -1419,12 +1539,31 @@ export default function Globe3D() {
             </div>
           </div>
 
-          <div className="mt-3 flex items-center justify-start gap-4 rounded border border-green-900/50 bg-black/35 px-3 py-2 text-xs">
-            <span className="flex items-center gap-2 text-green-700">
-              <Signal className="h-3.5 w-3.5" />
-              LIVE TRACKS
-            </span>
-            <span className="whitespace-nowrap font-bold text-green-300">FULL ORBIT TRAJECTORY</span>
+          <div className="mt-3 grid grid-cols-2 gap-1 rounded border border-green-900/50 bg-black/35 p-1 text-xs">
+            <button
+              type="button"
+              onClick={() => setTrackDisplayMode('ground')}
+              className={`flex min-h-9 items-center justify-center gap-2 rounded border px-2 font-black uppercase transition ${
+                trackDisplayMode === 'ground'
+                  ? 'border-green-400/70 bg-green-400/15 text-green-200 shadow-[0_0_12px_rgba(0,255,65,0.16)]'
+                  : 'border-transparent text-green-700 hover:border-green-900/80 hover:text-green-300'
+              }`}
+            >
+              <MapPin className="h-3.5 w-3.5" />
+              <span>GROUND TRACK</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTrackDisplayMode('orbit')}
+              className={`flex min-h-9 items-center justify-center gap-2 rounded border px-2 font-black uppercase transition ${
+                trackDisplayMode === 'orbit'
+                  ? 'border-cyan-300/70 bg-cyan-300/15 text-cyan-100 shadow-[0_0_12px_rgba(0,255,255,0.16)]'
+                  : 'border-transparent text-green-700 hover:border-green-900/80 hover:text-cyan-200'
+              }`}
+            >
+              <CircleDot className="h-3.5 w-3.5" />
+              <span>ORBIT RING</span>
+            </button>
           </div>
           {nextPassDate && (
             <div className="mt-3 rounded border border-green-900/50 bg-black/35 px-3 py-2 text-xs text-green-200">
