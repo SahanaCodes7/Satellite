@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { CircleMarker, MapContainer, TileLayer, Popup, Polyline, useMap, useMapEvents, Marker } from 'react-leaflet'
 import type { Map as LeafletMap } from 'leaflet'
 import L from 'leaflet'
+import { Home } from 'lucide-react'
 import satIconUrl from '../assets/satellite-icon.svg'
 import 'leaflet/dist/leaflet.css'
 import { calculateSatelliteGroundTrack } from '../lib/satelliteTracker'
@@ -25,7 +26,11 @@ interface SatelliteMapProps {
   satellites: SatellitePosition[]
   selectedSatellite: SatellitePosition | null
   onSelectSatellite: (sat: SatellitePosition) => void
+  onHome?: () => void
 }
+
+const INITIAL_MAP_CENTER: [number, number] = [20.5937, 78.9629]
+const INITIAL_MAP_ZOOM = 2
 
 const getSatelliteColor = (status: string) => {
   const color = status === 'active' ? '#00ff41' : status === 'maintenance' ? '#ffea00' : '#ff0040'
@@ -38,7 +43,11 @@ function MapController({ selectedSatellite }: { selectedSatellite: SatellitePosi
   const previousSelectedId = useRef<number | null>(null)
   
   useEffect(() => {
-    if (!selectedSatellite || previousSelectedId.current === selectedSatellite.id) return
+    if (!selectedSatellite) {
+      previousSelectedId.current = null
+      return
+    }
+    if (previousSelectedId.current === selectedSatellite.id) return
 
     previousSelectedId.current = selectedSatellite.id
     map.flyTo([selectedSatellite.latitude, selectedSatellite.longitude], Math.max(map.getZoom(), 5), {
@@ -71,7 +80,7 @@ function ZoomActivityController({
   return null
 }
 
-export default function SatelliteMap({ satellites, selectedSatellite, onSelectSatellite }: SatelliteMapProps) {
+export default function SatelliteMap({ satellites, selectedSatellite, onSelectSatellite, onHome }: SatelliteMapProps) {
   const mapRef = useRef<LeafletMap | null>(null)
   const [isZooming, setIsZooming] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(2)
@@ -112,6 +121,15 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
     trackedSatellite?.longitude
   ])
 
+  const handleHomeClick = () => {
+    const map = mapRef.current
+    if (map) {
+      map.closePopup()
+      map.setView(INITIAL_MAP_CENTER, INITIAL_MAP_ZOOM, { animate: true })
+    }
+    onHome?.()
+  }
+
   return (
     <div className="relative w-full h-full rounded-lg overflow-hidden border border-green-900/50">
       {/* Map Legend */}
@@ -139,8 +157,8 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
       </div>
 
       <MapContainer
-        center={[20.5937, 78.9629]} // Center on India
-        zoom={2}
+        center={INITIAL_MAP_CENTER}
+        zoom={INITIAL_MAP_ZOOM}
         style={{ height: '100%', width: '100%', background: '#0a0a0f' }}
         ref={mapRef}
         worldCopyJump={true}
@@ -252,6 +270,16 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
           ]
         })}
       </MapContainer>
+
+      <button
+        type="button"
+        onClick={handleHomeClick}
+        className="absolute bottom-[34px] right-2 z-[1000] flex h-10 w-10 items-center justify-center rounded border border-green-900/60 bg-black/85 text-green-300 shadow-[0_0_12px_rgba(0,255,65,0.18)] transition hover:border-green-500 hover:bg-green-500/10"
+        aria-label="Reset map view"
+        title="Reset map view"
+      >
+        <Home className="h-4 w-4" />
+      </button>
 
       {/* Ground Track Info */}
       {trackedSatellite && (

@@ -1,5 +1,5 @@
 import { useContext, useEffect, useMemo, useState } from 'react'
-import { Home, Map, Menu, X, Globe2, Camera } from 'lucide-react'
+import { Home, Map, Menu, X, Globe2, Camera, Radio } from 'lucide-react'
 import { Link, NavLink } from 'react-router-dom'
 import { UIContext } from '../contexts/UIContext'
 import { useSkyPasses, type SkyPassSatellite } from '../hooks/useSkyPasses'
@@ -40,6 +40,11 @@ export default function NavBar() {
         })
         .filter((sat): sat is SkyPassSatellite => Boolean(sat)),
     [totalSatellites]
+  )
+
+  const satelliteNames = useMemo(
+    () => Array.from(new Set(getSatelliteList().map(({ name }) => name))).sort((a, b) => a.localeCompare(b)),
+    []
   )
 
   const { passes, loading } = useSkyPasses(location, satelliteEntries)
@@ -84,7 +89,7 @@ export default function NavBar() {
   }, [showPassesPanel])
 
   return (
-    <header className="sticky top-0 z-50 border-b border-green-500/30 bg-[#050805]/95 font-mono text-green-400 shadow-[0_0_22px_rgba(0,255,65,0.12)] backdrop-blur">
+    <header className="sticky top-0 z-[2000] border-b border-green-500/30 bg-[#050805]/95 font-mono text-green-400 shadow-[0_0_22px_rgba(0,255,65,0.12)] backdrop-blur">
       <div className="mx-auto flex min-h-14 max-w-[1600px] items-center justify-between gap-3 px-3 sm:px-4">
         <div className="flex items-center gap-2">
         <Link
@@ -101,7 +106,8 @@ export default function NavBar() {
           onClick={() => setShowPassesPanel((v: boolean) => !v)}
           className={`ml-2 flex items-center gap-2 text-sm font-black tracking-wider ${showPassesPanel ? 'text-green-200 border border-green-400 px-2 rounded' : 'text-green-300'}`}
         >
-          📡 SKY PASSES
+          <Radio className="h-4 w-4" />
+          <span>SKY PASSES</span>
         </button>
         </div>
 
@@ -109,6 +115,8 @@ export default function NavBar() {
           <div className="relative">
             <input
               value={searchQuery}
+              list="satellite-autosuggest"
+              autoComplete="off"
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') emitSearchSubmit(searchQuery)
@@ -120,6 +128,11 @@ export default function NavBar() {
               style={{ color: '#00ff41', backgroundColor: '#0a0a0a' }}
               className={`h-10 min-w-[300px] ${isFocused ? 'w-[380px]' : ''} transition-all rounded border border-[#00ff41] bg-[#0a0a0a] px-3 py-2 font-mono text-sm text-[#00ff41] placeholder:text-[#00ff41]/50 outline-none focus:border-[#00ff41] focus:shadow-[0_0_8px_rgba(0,255,65,0.4)]`}
             />
+            <datalist id="satellite-autosuggest">
+              {satelliteNames.map((name) => (
+                <option key={name} value={name} />
+              ))}
+            </datalist>
             {searchQuery.length > 0 && (
               <button
                 type="button"
@@ -162,11 +175,11 @@ export default function NavBar() {
       </div>
 
       {showPassesPanel && (
-        <div className="absolute left-3 top-[4.25rem] z-50 w-80 rounded border border-green-500/40 bg-black/95 p-3 text-xs text-green-200 shadow-[0_0_18px_rgba(0,255,65,0.12)]">
-          <div className="font-black uppercase text-sm mb-2">📡 SKY PASSES</div>
+        <div className="absolute left-3 top-[4.25rem] z-[2100] w-80 rounded border border-green-500/40 bg-black/95 p-3 text-xs text-green-200 shadow-[0_0_18px_rgba(0,255,65,0.12)]">
+          <div className="font-black uppercase text-sm mb-2">SKY PASSES</div>
           <div className="mb-2 text-[11px] text-green-600">
             {location
-              ? `📍 ${location.lat.toFixed(4)}°N, ${location.lon.toFixed(4)}°E`
+              ? `${location.lat.toFixed(4)}N, ${location.lon.toFixed(4)}E`
               : usesDefaultLocation
                 ? 'USING DEFAULT LOCATION: NEW DELHI'
                 : locationMessage}

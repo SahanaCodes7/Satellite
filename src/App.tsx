@@ -132,10 +132,11 @@ function SatelliteTracker() {
     if (!onSatelliteSelect) return
     const unsubscribe = onSatelliteSelect((satellite: SatelliteData) => {
       if (!satellite) return
-      setSelectedSatellite(satellite)
+      const fullSatellite = satellites.find((sat) => sat.id === satellite.id)
+      if (fullSatellite) setSelectedSatellite(fullSatellite)
     })
     return () => unsubscribe()
-  }, [onSatelliteSelect])
+  }, [onSatelliteSelect, satellites])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -305,6 +306,7 @@ function SatelliteTracker() {
                   const fullSatData = satellites.find(s => s.id === sat.id)
                   if (fullSatData) setSelectedSatellite(fullSatData)
                 }}
+                onHome={() => setSelectedSatellite(null)}
               />
             </Suspense>
           </div>
@@ -566,7 +568,24 @@ function SatelliteTracker() {
             <span>SGP4/SDP4 PROPAGATOR</span>
           </div>
           <div className="text-green-600">
-            ISRO SATELLITE TRACKING SYSTEM v2.0 • USING SATELLITE.JS
+            Created by{' '}
+            <a
+              href="https://studentofstars.github.io/My-Portfolio/"
+              target="_blank"
+              rel="noreferrer"
+              className="text-green-400 underline underline-offset-2 hover:text-green-300"
+            >
+              Mrutyunjaya Muduli
+            </a>{' '}
+            and{' '}
+            <a
+              href="https://sahanaportfolio.vercel.app/"
+              target="_blank"
+              rel="noreferrer"
+              className="text-green-400 underline underline-offset-2 hover:text-green-300"
+            >
+              Sahana L
+            </a>
           </div>
         </div>
       </motion.footer>
