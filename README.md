@@ -21,13 +21,6 @@
 > 📹 **Demo Video**
 >
 > https://github.com/studentofstars/Satellite/assets/demo.mp4
->
-> *(Screen recording embedded above — GitHub renders .mp4 files natively
->   when uploaded via GitHub web interface to the repository assets)*
-
-> 💡 **To add your recording**: Go to your GitHub repo → Issues →
-> drag and drop your .mp4 file → copy the generated link →
-> replace the video URL above with your link
 
 ---
 
