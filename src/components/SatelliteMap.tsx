@@ -8,10 +8,10 @@ import 'leaflet/dist/leaflet.css'
 import { calculateSatelliteGroundTrack } from '../lib/satelliteTracker'
 
 interface SatellitePosition {
-  id: number
+  id: number | string
   name: string
   type: string
-  noradId: number
+  noradId: number | null
   status: string
   latitude: number
   longitude: number
@@ -20,6 +20,7 @@ interface SatellitePosition {
   launchDate?: string
   signalStrength?: number
   lastUpdate?: Date
+  isDeepSpace?: boolean
 }
 
 interface SatelliteMapProps {
@@ -40,10 +41,10 @@ const getSatelliteColor = (status: string) => {
 // Component to handle map view updates
 function MapController({ selectedSatellite }: { selectedSatellite: SatellitePosition | null }) {
   const map = useMap()
-  const previousSelectedId = useRef<number | null>(null)
+  const previousSelectedId = useRef<number | string | null>(null)
   
   useEffect(() => {
-    if (!selectedSatellite) {
+    if (!selectedSatellite || selectedSatellite.isDeepSpace) {
       previousSelectedId.current = null
       return
     }
@@ -84,6 +85,7 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
   const mapRef = useRef<LeafletMap | null>(null)
   const [isZooming, setIsZooming] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(2)
+
   const trackedSatellite = selectedSatellite
     ? satellites.find((sat) => sat.id === selectedSatellite.id) ?? selectedSatellite
     : null
@@ -103,7 +105,7 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
   )
   
   const orbitPath = useMemo(() => {
-    if (!trackedSatellite) return []
+    if (!trackedSatellite || trackedSatellite.isDeepSpace) return []
 
     return calculateSatelliteGroundTrack(
       trackedSatellite.noradId,
@@ -195,7 +197,7 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
         ))}
 
         {/* Satellite markers */}
-        {satellites.map((sat) => {
+        {satellites.filter((sat) => !sat.isDeepSpace).map((sat) => {
           const isSelected = trackedSatellite?.id === sat.id
           if (isZooming && !isSelected) return null
 
@@ -282,7 +284,7 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
       </button>
 
       {/* Ground Track Info */}
-      {trackedSatellite && (
+      {trackedSatellite && !trackedSatellite.isDeepSpace && (
         <div className="absolute bottom-2 left-2 z-[1000] bg-black/80 px-3 py-2 rounded border border-green-900/50 text-xs">
           <span className="text-green-600">TRACKING: </span>
           <span className="text-green-400 font-bold">{trackedSatellite.name}</span>
@@ -363,6 +365,10 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
         }
         .leaflet-control-attribution a {
           color: #00ff41 !important;
+        }
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
         }
       `}</style>
     </div>

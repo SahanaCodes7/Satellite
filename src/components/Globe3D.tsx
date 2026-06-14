@@ -4,13 +4,15 @@ import { OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
 // Note: using basic THREE.Line for subtle ground tracks; no Line2 required
 import * as satellite from 'satellite.js'
-import { Activity, CircleDot, Database, MapPin, Satellite as SatelliteIcon, Zap } from 'lucide-react'
+import { Activity, CircleDot, Database, MapPin, RefreshCw, Satellite as SatelliteIcon, Zap } from 'lucide-react'
 import {
   calculateAllSatellitePositions,
   calculateSatellitePosition,
+  clearAdityaL1PositionCache,
   initializeSatelliteRecords,
   initializeTLEData,
   SATELLITE_TLE_DATA,
+  type SatelliteId,
   type SatellitePosition,
   type TLEDataSource
 } from '../lib/satelliteTracker'
@@ -22,6 +24,20 @@ const EARTH_DAY_TEXTURE_URL = 'https://cdn.jsdelivr.net/npm/three-globe/example/
 const EARTH_NIGHT_TEXTURE_URL = 'https://cdn.jsdelivr.net/npm/three-globe/example/img/earth-night.jpg'
 const WORLD_BORDERS_URL = 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson'
 const GROUND_TRACK_RADIUS = EARTH_RADIUS * 1.002
+const ADITYA_REFRESH_INTERVAL_MS = 5 * 60 * 1000
+
+function formatCountdown(milliseconds: number) {
+  const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000))
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
+function formatDistanceChange(distanceChange: number) {
+  if (distanceChange > 0.1) return `+${distanceChange.toFixed(1)} km/hr (moving away)`
+  if (distanceChange < -0.1) return `${distanceChange.toFixed(1)} km/hr (moving closer)`
+  return '~0.0 km/hr (stable)'
+}
 
 interface GeoJsonGeometry {
   type: 'Polygon' | 'MultiPolygon'
@@ -37,7 +53,7 @@ interface GeoJsonFeatureCollection {
 }
 
 interface GlobeSatellite extends SatellitePosition {
-  satrec: satellite.SatRec
+  satrec?: satellite.SatRec
 }
 
 type TrackDisplayMode = 'ground' | 'orbit'
@@ -74,7 +90,9 @@ function ecfToVector3(positionEcf: satellite.EcfVec3<number>, scale: number) {
   )
 }
 
-function createSatelliteRecord(noradId: number): satellite.SatRec | null {
+function createSatelliteRecord(noradId: number | null): satellite.SatRec | null {
+  if (noradId === null) return null
+
   const data = SATELLITE_TLE_DATA[noradId]
   if (!data) return null
 
@@ -91,6 +109,7 @@ function createSatelliteRecord(noradId: number): satellite.SatRec | null {
 function attachRecords(positions: SatellitePosition[]) {
   return positions
     .map((position) => {
+      if (position.isDeepSpace) return position
       const satrec = createSatelliteRecord(position.noradId)
       return satrec ? { ...position, satrec } : null
     })
@@ -98,6 +117,8 @@ function attachRecords(positions: SatellitePosition[]) {
 }
 
 function propagateGlobeSatellite(baseSatellite: GlobeSatellite, date: Date): SatellitePosition | null {
+  if (!baseSatellite.satrec || baseSatellite.isDeepSpace) return null
+
   try {
     const state = satellite.propagate(baseSatellite.satrec, date)
     if (!state) return null
@@ -224,33 +245,61 @@ function useSafeTexture(url: string) {
   return { texture, failed }
 }
 
-function createDotTexture(color: string) {
+function hexToRgba(hex: string, alpha: number) {
+  const r = parseInt(hex.slice(1, 3), 16)
+  const g = parseInt(hex.slice(3, 5), 16)
+  const b = parseInt(hex.slice(5, 7), 16)
+  return `rgba(${r},${g},${b},${alpha})`
+}
+
+function createDotTexture(color: string = '#00ff41'): THREE.CanvasTexture {
   const canvas = document.createElement('canvas')
-  const ctx = canvas.getContext('2d')
+  canvas.width = 64
+  canvas.height = 64
+  const ctx = canvas.getContext('2d')!
+
+  const glow = ctx.createRadialGradient(32, 32, 2, 32, 32, 32)
+  glow.addColorStop(0.0, hexToRgba(color, 1.0))
+  glow.addColorStop(0.4, hexToRgba(color, 0.6))
+  glow.addColorStop(0.8, hexToRgba(color, 0.15))
+  glow.addColorStop(1.0, hexToRgba(color, 0))
+  ctx.fillStyle = glow
+  ctx.fillRect(0, 0, 64, 64)
+
+  ctx.fillStyle = '#ffffff'
+  ctx.beginPath()
+  ctx.arc(32, 32, 5, 0, Math.PI * 2)
+  ctx.fill()
+
+  return new THREE.CanvasTexture(canvas)
+}
+
+function createAdityaDotTexture(color: string = '#ffaa00') {
+  const canvas = document.createElement('canvas')
   canvas.width = 128
   canvas.height = 128
-  if (!ctx) return null
+  const ctx = canvas.getContext('2d')!
 
-  const rgbaColor = color
-  const outerGlow = ctx.createRadialGradient(64, 64, 10, 64, 64, 64)
-  outerGlow.addColorStop(0, `rgba(${parseInt(color.slice(1, 3), 16)}, ${parseInt(color.slice(3, 5), 16)}, ${parseInt(color.slice(5, 7), 16)}, 0.6)`)
-  outerGlow.addColorStop(0.5, `rgba(${parseInt(color.slice(1, 3), 16)}, ${parseInt(color.slice(3, 5), 16)}, ${parseInt(color.slice(5, 7), 16)}, 0.2)`)
-  outerGlow.addColorStop(1, `rgba(${parseInt(color.slice(1, 3), 16)}, ${parseInt(color.slice(3, 5), 16)}, ${parseInt(color.slice(5, 7), 16)}, 0)`)
+  ctx.clearRect(0, 0, 128, 128)
+
+  const outerGlow = ctx.createRadialGradient(64, 64, 0, 64, 64, 64)
+  outerGlow.addColorStop(0, hexToRgba(color, 0.8))
+  outerGlow.addColorStop(0.3, hexToRgba(color, 0.5))
+  outerGlow.addColorStop(0.6, hexToRgba(color, 0.2))
+  outerGlow.addColorStop(1, hexToRgba(color, 0))
   ctx.fillStyle = outerGlow
   ctx.fillRect(0, 0, 128, 128)
 
-  const core = ctx.createRadialGradient(64, 64, 0, 64, 64, 16)
+  const core = ctx.createRadialGradient(64, 64, 0, 64, 64, 18)
   core.addColorStop(0, 'rgba(255, 255, 255, 1)')
-  core.addColorStop(0.5, rgbaColor)
-  core.addColorStop(1, `rgba(${parseInt(color.slice(1, 3), 16)}, ${parseInt(color.slice(3, 5), 16)}, ${parseInt(color.slice(5, 7), 16)}, 0)`)
+  core.addColorStop(0.4, hexToRgba(color, 1))
+  core.addColorStop(1, hexToRgba(color, 0))
   ctx.fillStyle = core
   ctx.beginPath()
-  ctx.arc(64, 64, 16, 0, Math.PI * 2)
+  ctx.arc(64, 64, 18, 0, Math.PI * 2)
   ctx.fill()
 
-  const texture = new THREE.CanvasTexture(canvas)
-  texture.colorSpace = THREE.SRGBColorSpace
-  return texture
+  return new THREE.CanvasTexture(canvas)
 }
 
 function createSatelliteIconTexture() {
@@ -648,37 +697,47 @@ function SatelliteSprites({
   highlightedIds
 }: {
   satellites: GlobeSatellite[]
-  selectedId: number | null
+  selectedId: SatelliteId | null
   onSelect: (satellite: SatellitePosition) => void
   onSelectedFrame: (satellite: SatellitePosition) => void
-  highlightedIds: Set<number>
+  highlightedIds: Set<SatelliteId>
 }) {
   const spriteRefs = useRef<(THREE.Sprite | null)[]>([])
   const labelRefs = useRef<(THREE.Sprite | null)[]>([])
   const latestSelectedRef = useRef<SatellitePosition | null>(null)
   const elapsedRef = useRef(0)
-  const dotTextures = useMemo(
-    () => satellites.map((sat) => createDotTexture(getTypeColor(sat.type))),
-    [satellites]
-  )
+  const dotTextureMap = useRef<Record<string, THREE.CanvasTexture>>({})
   const satelliteIconTexture = useMemo(() => createSatelliteIconTexture(), [])
   const issLabelTexture = useMemo(() => createTextTexture('ISS', '#ffd86b'), [])
 
+  if (Object.keys(dotTextureMap.current).length === 0) {
+    const colors = ['#00ff41', '#00ffff', '#ffff00', '#ff8800', '#aa00ff', '#ff4444', '#ffaa00']
+    colors.forEach((color) => {
+      dotTextureMap.current[color] = createDotTexture(color)
+    })
+  }
+
+  useEffect(() => {
+    return () => {
+      Object.values(dotTextureMap.current).forEach((texture) => texture.dispose())
+      dotTextureMap.current = {}
+    }
+  }, [])
+
   const dotMaterials = useMemo(
     () =>
-      satellites.map((sat, index) =>
+      satellites.map((sat) =>
         new THREE.SpriteMaterial({
-          map: dotTextures[index] ?? undefined,
-          color: '#ffffff',
+          map: dotTextureMap.current[getTypeColor(sat.type)] ?? dotTextureMap.current['#00ff41'],
           transparent: true,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
           depthTest: true,
+          depthWrite: false,
           sizeAttenuation: true,
-          opacity: highlightedIds.size === 0 || highlightedIds.has(sat.id) ? 1 : 0.2
+          opacity: 1.0,
+          blending: THREE.NormalBlending
         })
       ),
-    [satellites, dotTextures, highlightedIds]
+    [satellites, highlightedIds]
   )
 
   const iconMaterials = useMemo(
@@ -688,11 +747,11 @@ function SatelliteSprites({
           map: satelliteIconTexture ?? undefined,
           color: /ISS/i.test(sat.name) ? '#fff7d1' : '#ffffff',
           transparent: true,
-          blending: THREE.AdditiveBlending,
+          blending: THREE.NormalBlending,
           depthWrite: false,
           depthTest: true,
           sizeAttenuation: true,
-          opacity: highlightedIds.size === 0 || highlightedIds.has(sat.id) ? 1 : 0.2
+          opacity: 1.0
         })
       ),
     [satellites, satelliteIconTexture, highlightedIds]
@@ -713,14 +772,13 @@ function SatelliteSprites({
 
   useEffect(
     () => () => {
-      dotTextures.forEach((texture) => texture?.dispose())
       satelliteIconTexture?.dispose()
       issLabelTexture?.dispose()
       dotMaterials.forEach((material) => material.dispose())
       iconMaterials.forEach((material) => material.dispose())
       issLabelMaterial.dispose()
     },
-    [dotMaterials, dotTextures, iconMaterials, issLabelTexture, issLabelMaterial, satelliteIconTexture]
+    [dotMaterials, iconMaterials, issLabelTexture, issLabelMaterial, satelliteIconTexture]
   )
 
   useEffect(() => {
@@ -734,7 +792,7 @@ function SatelliteSprites({
     satellites.forEach((sat, index) => {
       const sprite = spriteRefs.current[index]
       const labelSprite = labelRefs.current[index]
-      if (!sprite || !sat.satrec) return
+      if (!sprite || !sat.satrec || sat.isDeepSpace) return
 
       try {
         const state = satellite.propagate(sat.satrec, now)
@@ -759,8 +817,8 @@ function SatelliteSprites({
 
         const isSelected = sat.id === selectedId
         const isISS = /ISS/i.test(sat.name)
-        const baseScale = isISS ? 0.22 : 0.18
-        const selectedScale = isISS ? 0.32 : 0.26
+        const baseScale = 0.15
+        const selectedScale = 0.22
         const material = isSelected ? iconMaterials[index] : dotMaterials[index]
 
         sprite.position.copy(vec)
@@ -771,7 +829,7 @@ function SatelliteSprites({
           sprite.material.needsUpdate = true
         }
         sprite.material.opacity = highlightedIds.size === 0 || highlightedIds.has(sat.id) ? 1 : 0.2
-        sprite.scale.setScalar(isSelected ? selectedScale : baseScale)
+        sprite.scale.set(isSelected ? selectedScale : baseScale, isSelected ? selectedScale : baseScale, isSelected ? selectedScale : baseScale)
 
         if (labelSprite && isISS) {
           const labelOffset = vec.clone().multiplyScalar(1.08)
@@ -803,6 +861,8 @@ function SatelliteSprites({
   return (
     <group>
       {satellites.map((sat, index) => {
+        if (sat.isDeepSpace) return null
+
         const isSelected = sat.id === selectedId
         const isISS = /ISS/i.test(sat.name)
         const position = satelliteToVector3(sat)
@@ -813,9 +873,9 @@ function SatelliteSprites({
                 spriteRefs.current[index] = sprite
               }}
               position={position}
-              scale={isSelected ? [isISS ? 0.22 : 0.18, isISS ? 0.22 : 0.18, isISS ? 0.22 : 0.18] : [isISS ? 0.15 : 0.12, isISS ? 0.15 : 0.12, isISS ? 0.15 : 0.12]}
+              scale={isSelected ? [0.22, 0.22, 0.22] : [0.15, 0.15, 0.15]}
               material={isSelected ? iconMaterials[index] : dotMaterials[index]}
-              renderOrder={1}
+              renderOrder={2}
               onClick={(event) => {
                 event.stopPropagation()
                 const sprite = spriteRefs.current[index]
@@ -837,6 +897,114 @@ function SatelliteSprites({
           </group>
         )
       })}
+    </group>
+  )
+}
+
+function AdityaL1Marker({
+  selectedId,
+  onSelect
+}: {
+  selectedId: SatelliteId | null
+  onSelect: (satellite: SatellitePosition) => void
+}) {
+  const spriteRef = useRef<THREE.Sprite | null>(null)
+  const texture = useMemo(() => createAdityaDotTexture('#ffaa00'), [])
+  const material = useMemo(
+    () =>
+      new THREE.SpriteMaterial({
+        map: texture ?? undefined,
+        color: '#ffaa00',
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: true,
+        sizeAttenuation: true,
+        opacity: 1.0
+      }),
+    [texture]
+  )
+
+  const lineGeometry = useMemo(() => {
+    const geometry = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(EARTH_RADIUS * 5, 0, 0)
+    ])
+    return geometry
+  }, [])
+
+  const lineMaterial = useMemo(
+    () =>
+      new THREE.LineDashedMaterial({
+        color: '#ffaa00',
+        transparent: true,
+        opacity: 0.18,
+        dashSize: 0.18,
+        gapSize: 0.14,
+        depthWrite: false,
+        depthTest: true
+      }),
+    []
+  )
+  const dashedLine = useMemo(() => {
+    const line = new THREE.Line(lineGeometry, lineMaterial)
+    line.computeLineDistances()
+    return line
+  }, [lineGeometry, lineMaterial])
+
+  useEffect(
+    () => () => {
+      texture?.dispose()
+      material.dispose()
+      lineGeometry.dispose()
+      lineMaterial.dispose()
+    },
+    [lineGeometry, lineMaterial, material, texture]
+  )
+
+  useFrame(({ clock }) => {
+    if (!spriteRef.current) return
+    const pulse = 1 + Math.sin(clock.elapsedTime * 2) * 0.18
+    spriteRef.current.scale.setScalar(0.18)
+    spriteRef.current.material.opacity = selectedId === 'aditya-l1' ? 1 : 0.82 + pulse * 0.08
+  })
+
+  const adityaPosition: SatellitePosition = {
+    id: 'aditya-l1',
+    name: 'ADITYA-L1',
+    type: 'SOLAR OBSERVATORY',
+    noradId: null,
+    status: 'ACTIVE',
+    latitude: 0,
+    longitude: 0,
+    altitude: 1502347,
+    velocity: 0.387,
+    launchDate: 'Sep 2, 2023',
+    signalStrength: 100,
+    lastUpdate: new Date(),
+    isDeepSpace: true,
+    distanceFromEarth: 1502347,
+    distanceAU: 0.01004,
+    distanceChangeKmPerHour: 0,
+    mission: 'Solar wind & CME observation, studying solar corona',
+    color: '#ffaa00',
+    isRealData: false
+  }
+
+  return (
+    <group>
+      <primitive object={dashedLine} renderOrder={1} />
+      <sprite
+        ref={spriteRef}
+        position={[EARTH_RADIUS * 5, 0, 0]}
+        scale={[0.2, 0.2, 0.2]}
+        material={material}
+        renderOrder={1}
+        onClick={(event) => {
+          event.stopPropagation()
+          onSelect(adityaPosition)
+        }}
+      />
     </group>
   )
 }
@@ -1026,10 +1194,13 @@ type Tracks = {
 function calculateTracksForSatellite(selectedSatellite: SatellitePosition | null, nowMs: number): Tracks {
   const empty: Tracks = { orbitPast: [], orbitFuture: [], groundPast: [], groundFuture: [] }
   if (!selectedSatellite) return empty
+  if (selectedSatellite.isDeepSpace) return empty
 
   const orbitPast: THREE.Vector3[] = []
   const orbitFuture: THREE.Vector3[] = []
   const satrec = (selectedSatellite as GlobeSatellite).satrec
+  if (!satrec) return empty
+
   const orbitalPeriodMinutes = Number.isFinite(satrec?.no) && satrec.no > 0
     ? Math.min((2 * Math.PI) / satrec.no, 24 * 60)
     : 95
@@ -1067,6 +1238,7 @@ function calculateTracksForSatellite(selectedSatellite: SatellitePosition | null
       }
     } else {
       // Fallback: use lat/lng when satrec is unavailable
+      if (selectedSatellite.noradId === null) continue
       const sample = calculateSatellitePosition(selectedSatellite.noradId, date)
       if (!sample) continue
       const orbitPoint = latLngToVector3(
@@ -1150,7 +1322,7 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function Globe3D() {
   const [satellites, setSatellites] = useState<GlobeSatellite[]>([])
-  const [selectedId, setSelectedId] = useState<number | null>(null)
+  const [selectedId, setSelectedId] = useState<SatelliteId | null>(null)
   const [selectedSatellite, setSelectedSatellite] = useState<SatellitePosition | null>(null)
   const [trackDisplayMode, setTrackDisplayMode] = useState<TrackDisplayMode>('ground')
   const [now, setNow] = useState(() => new Date())
@@ -1160,11 +1332,13 @@ export default function Globe3D() {
   const { searchQuery, setTotalSatellites, setMatchCount, onSearchSubmit, onSatelliteSelect } = useContext(UIContext)
   const [isLegendOpen, setIsLegendOpen] = useState(false)
   const [nextPassDate, setNextPassDate] = useState<Date | null>(null)
-  const [lastPassSatId, setLastPassSatId] = useState<number | null>(null)
+  const [lastPassSatId, setLastPassSatId] = useState<SatelliteId | null>(null)
+  const [isAdityaRefreshing, setIsAdityaRefreshing] = useState(false)
+  const [nextAdityaRefreshAt, setNextAdityaRefreshAt] = useState(() => Date.now() + ADITYA_REFRESH_INTERVAL_MS)
 
-  const selectedIdRef = useRef<number | null>(null)
+  const selectedIdRef = useRef<SatelliteId | null>(null)
   const latestSelectedPositionRef = useRef<SatellitePosition | null>(null)
-  const lastTracksForIdRef = useRef<number | null>(null)
+  const lastTracksForIdRef = useRef<SatelliteId | null>(null)
   const lastTracksTimeRef = useRef(0)
   const cameraDistanceRef = useRef(EARTH_RADIUS * 2.5)
   const cameraTargetRef = useRef<any>(null)
@@ -1181,7 +1355,8 @@ export default function Globe3D() {
       satellites.filter((sat) =>
         !searchLower ||
         sat.name.toLowerCase().includes(searchLower) ||
-        sat.type.toLowerCase().includes(searchLower)
+        sat.type.toLowerCase().includes(searchLower) ||
+        (sat.isDeepSpace && 'aditya l1 solar sun observatory'.includes(searchLower))
       ),
     [satellites, searchLower]
   )
@@ -1223,13 +1398,13 @@ export default function Globe3D() {
       return
     }
 
-    const nextPass = calculateNextIndiaPass(globeSat, new Date())
+    const nextPass = globeSat.isDeepSpace ? null : calculateNextIndiaPass(globeSat, new Date())
     setNextPassDate(nextPass)
     setLastPassSatId(selectedId)
   }, [selectedId, satellites, lastPassSatId])
 
-  const refreshAllSatellites = useCallback((date: Date) => {
-    const positions = attachRecords(calculateAllSatellitePositions(date))
+  const refreshAllSatellites = useCallback(async (date: Date) => {
+    const positions = attachRecords(await calculateAllSatellitePositions(date))
     setSatellites(positions)
     const currentSelectedId = selectedIdRef.current
 
@@ -1247,6 +1422,28 @@ export default function Globe3D() {
     })
   }, [])
 
+  const refreshAdityaL1Data = useCallback(async () => {
+    clearAdityaL1PositionCache()
+    setIsAdityaRefreshing(true)
+    const date = new Date()
+    setNow(date)
+
+    try {
+      await refreshAllSatellites(date)
+    } finally {
+      setIsAdityaRefreshing(false)
+      setNextAdityaRefreshAt(Date.now() + ADITYA_REFRESH_INTERVAL_MS)
+    }
+  }, [refreshAllSatellites])
+
+  useEffect(() => {
+    if (isInitializing) return
+
+    setNextAdityaRefreshAt(Date.now() + ADITYA_REFRESH_INTERVAL_MS)
+    const intervalId = window.setInterval(refreshAdityaL1Data, ADITYA_REFRESH_INTERVAL_MS)
+    return () => window.clearInterval(intervalId)
+  }, [isInitializing, refreshAdityaL1Data])
+
   useEffect(() => {
     let isCancelled = false
 
@@ -1256,7 +1453,7 @@ export default function Globe3D() {
 
       const fallbackDate = new Date()
       setNow(fallbackDate)
-      refreshAllSatellites(fallbackDate)
+      await refreshAllSatellites(fallbackDate)
 
       try {
         const source = await initializeTLEData()
@@ -1266,7 +1463,7 @@ export default function Globe3D() {
         initializeSatelliteRecords()
         const date = new Date()
         setNow(date)
-        const positions = attachRecords(calculateAllSatellitePositions(date))
+        const positions = attachRecords(await calculateAllSatellitePositions(date))
         setSatellites(positions)
         const currentSelectedId = selectedIdRef.current
         const updatedSelection = currentSelectedId !== null
@@ -1308,6 +1505,17 @@ export default function Globe3D() {
     // Instantly hide any old tracks by clearing computedTracks
     setComputedTracks({ orbitPast: [], orbitFuture: [], groundPast: [], groundFuture: [] })
 
+    if (satellite.isDeepSpace) {
+      setNextPassDate(null)
+      setLastPassSatId(satellite.id)
+      cameraTargetRef.current = {
+        position: new THREE.Vector3(EARTH_RADIUS * 6.4, EARTH_RADIUS * 1.2, EARTH_RADIUS * 2.1),
+        lookAt: new THREE.Vector3(EARTH_RADIUS * 5, 0, 0)
+      }
+      isAnimatingRef.current = true
+      return
+    }
+
     // Synchronously compute new tracks now and set them so lines update immediately
     const nowMs = Date.now()
     const tracks = calculateTracksForSatellite(satellite, nowMs)
@@ -1348,6 +1556,7 @@ export default function Globe3D() {
 
       const targetId = selectedIdRef.current
       if (!targetId) return
+      if (targetId === 'aditya-l1') return
 
       const updated = calculateSatellitePosition(targetId, date)
       if (updated) setSelectedSatellite(updated)
@@ -1361,7 +1570,15 @@ export default function Globe3D() {
     const unsubscribe = onSearchSubmit((query: string) => {
       if (!query) return
       const lower = query.trim().toLowerCase()
-      const matches = satellites.filter((sat) => sat.name.toLowerCase().includes(lower) || sat.type.toLowerCase().includes(lower))
+      const matches = satellites.filter((sat) => {
+        const searchText = [
+          sat.name,
+          sat.type,
+          sat.mission ?? '',
+          sat.isDeepSpace ? 'aditya l1 solar sun observatory' : ''
+        ].join(' ').toLowerCase()
+        return searchText.includes(lower)
+      })
       if (matches[0]) handleSelectSatellite(matches[0])
     })
     return () => unsubscribe()
@@ -1376,6 +1593,12 @@ export default function Globe3D() {
     })
     return () => unsubscribe()
   }, [onSatelliteSelect, satellites, handleSelectSatellite])
+
+  const adityaDistanceChange = selectedSatellite?.isDeepSpace
+    ? selectedSatellite.distanceChangeKmPerHour ?? 0
+    : 0
+  const adityaDistanceChangeLabel = formatDistanceChange(adityaDistanceChange)
+  const adityaRefreshCountdown = formatCountdown(nextAdityaRefreshAt - now.getTime())
 
   return (
     <main className="relative h-[calc(100vh-3.5rem)] overflow-hidden bg-[#0a0a0a] font-mono text-green-400 scanlines">
@@ -1414,6 +1637,7 @@ export default function Globe3D() {
           onSelectedFrame={handleSelectedFrame}
           highlightedIds={highlightedIds}
         />
+        <AdityaL1Marker selectedId={selectedId} onSelect={handleSelectSatellite} />
 
         {/* No HTML labels on the globe per spec */}
         <OrbitControls
@@ -1474,7 +1698,58 @@ export default function Globe3D() {
         </div>
       </div>
 
-      {selectedSatellite && (
+      {selectedSatellite?.isDeepSpace && (
+        <aside className="terminal-panel absolute bottom-3 left-3 right-3 max-w-md border-[#ffaa00]/70 bg-black/90 p-4 text-sm text-yellow-300 shadow-[0_0_28px_rgba(255,170,0,0.20)] sm:bottom-4 sm:left-4 sm:right-auto">
+          <div className="space-y-3 rounded border border-[#ffaa00]/70 bg-yellow-500/10 p-4">
+            <div>
+              <div className="text-xl font-black text-[#ffaa00] glow-yellow">☀️ ADITYA-L1</div>
+              <div className="mt-2 text-sm font-black tracking-wider">SUN-EARTH L1 POINT</div>
+              <div className="mt-1 text-xs text-yellow-600">(Symbolic position - not to scale)</div>
+              {selectedSatellite.isRealData ? (
+                <div className="mt-3 inline-flex max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded border border-green-400/70 bg-green-500/10 px-2 py-1 text-[11px] font-black text-green-300">
+                  ● LIVE DATA
+                </div>
+              ) : (
+                <div className="mt-3 inline-flex max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded border border-orange-500/70 bg-orange-500/10 px-2 py-1 text-[11px] font-black text-orange-300">
+                  ⚠ ESTIMATED DATA
+                </div>
+              )}
+            </div>
+
+            <div className="grid gap-2 border-y border-yellow-600/30 py-3 text-xs">
+              <div className="flex justify-between gap-3 rounded bg-black/25 p-2">
+                <span className="text-yellow-700">DISTANCE FROM EARTH</span>
+                <span className="font-bold text-yellow-300">{Math.round(selectedSatellite.distanceFromEarth ?? selectedSatellite.altitude).toLocaleString()} km</span>
+              </div>
+              <div className="flex justify-between gap-3 rounded bg-black/25 p-2">
+                <span className="text-yellow-700">DISTANCE CHANGE</span>
+                <span className="text-right font-bold text-yellow-300">{adityaDistanceChangeLabel}</span>
+              </div>
+              <div className="flex justify-between gap-3 rounded bg-black/25 p-2">
+                <span className="text-yellow-700">VELOCITY</span>
+                <span className="font-bold text-yellow-300">{selectedSatellite.velocity.toFixed(3)} km/s</span>
+              </div>
+            </div>
+
+            <div className="rounded border border-[#ffaa00]/70 bg-black/20 p-3 text-xs text-yellow-200 shadow-[0_0_14px_rgba(255,170,0,0.12)]">
+              <div className="mb-2 font-black tracking-wider text-[#ffaa00]">WHY NO MAP TRACKING?</div>
+              <div className="space-y-1 leading-relaxed">
+                <div>Aditya-L1 orbits the Sun-Earth L1 Lagrange point, 1.5 MILLION km away.</div>
+                <div>It has no latitude/longitude on Earth.</div>
+                <div>Standard TLE tracking doesn't apply.</div>
+                <div>Position data via NASA JPL HORIZONS.</div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-2 text-xs text-yellow-600">
+              <span>🔄 Next update in: {adityaRefreshCountdown}</span>
+              <RefreshCw className={`h-3.5 w-3.5 text-yellow-400 ${isAdityaRefreshing ? 'animate-spin' : ''}`} />
+            </div>
+          </div>
+        </aside>
+      )}
+
+      {selectedSatellite && !selectedSatellite.isDeepSpace && (
         <aside className="terminal-panel absolute bottom-3 left-3 right-3 max-w-md bg-black/90 p-4 text-sm shadow-[0_0_28px_rgba(0,255,65,0.20)] sm:bottom-4 sm:left-4 sm:right-auto">
           <div className="mb-3 flex items-start justify-between gap-3 border-b border-green-900/70 pb-3">
             <div className="min-w-0">

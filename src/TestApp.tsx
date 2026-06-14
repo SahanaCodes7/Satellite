@@ -22,7 +22,7 @@ export default function TestApp() {
         tracker.initializeSatelliteRecords()
         
         setStatus('Calculating positions...')
-        const positions = tracker.calculateAllSatellitePositions(new Date())
+        const positions = await tracker.calculateAllSatellitePositions(new Date())
         setCount(positions.length)
         setStatus(`SUCCESS! Found ${positions.length} satellites!`)
       } catch (err) {
