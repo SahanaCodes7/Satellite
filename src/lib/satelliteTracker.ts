@@ -147,6 +147,7 @@ const INDIAN_SATELLITES_THROUGH_2000: IndianSatelliteMetadata[] = [
   { noradId: 41384, name: 'IRNSS 1F', launchYear: 2016, launchMonth: 3, launchDay: 10 },
   { noradId: 41241, name: 'IRNSS-1E', launchYear: 2016, launchMonth: 1, launchDay: 20 },
   { noradId: 41028, name: 'GSAT 15', launchYear: 2015, launchMonth: 11, launchDay: 6 },
+  { noradId: 40930, name: 'ASTROSAT', launchYear: 2015, launchMonth: 9, launchDay: 28 },
   { noradId: 40880, name: 'GSAT 6', launchYear: 2015, launchMonth: 8, launchDay: 27 },
   { noradId: 40547, name: 'IRNSS 1D', launchYear: 2015, launchMonth: 3, launchDay: 28 },
   { noradId: 40332, name: 'GSAT 16', launchYear: 2014, launchMonth: 12, launchDay: 5 },
@@ -206,7 +207,7 @@ const INDIAN_SATELLITE_QUERY_TERMS = [
   'INSAT', 'XPOSAT', 'CHANDRAYAAN', 'ADITYA', 'AFR', 'POEM',
   'RISAT', 'CARTOSAT', 'RESOURCESAT', 'SCATSAT', 'PRATHAM', 'IRNSS',
   'SARAL', 'SRMSAT', 'JUGNU', 'YOUTHSAT', 'STUDSAT', 'OCEANSAT',
-  'IMS', 'HAMSAT', 'IRS', 'KALPANA', 'MARS ORBITER'
+  'IMS', 'HAMSAT', 'IRS', 'KALPANA', 'MARS ORBITER', 'ASTROSAT'
 ]
 
 // Indian satellite search patterns and their display types
@@ -234,6 +235,7 @@ const ISRO_SATELLITE_PATTERNS: { pattern: string; type: string }[] = [
   { pattern: 'CHANDRAYAAN', type: 'Scientific' },
   { pattern: 'MARS ORBITER', type: 'Scientific' },
   { pattern: 'XPOSAT', type: 'Scientific' },
+  { pattern: 'ASTROSAT', type: 'Scientific' },
   { pattern: 'CH 3', type: 'Lunar Mission' },
   { pattern: 'HAMSAT', type: 'Amateur Radio' },
   { pattern: 'PRATHAM', type: 'Student Satellite' },
@@ -671,6 +673,12 @@ export let SATELLITE_TLE_DATA: Record<number, TLEData> = filterTLEToIndianSatell
     type: 'Altimetry',
     tle1: '1 39086U 13009A   25346.85214521  .00000214  00000+0  32145-4 0  9993',
     tle2: '2 39086  98.5478  95.1478 0001478  85.4521 274.7854 14.32145214521478'
+  },
+  40930: {
+    name: 'ASTROSAT',
+    type: 'Scientific',
+    tle1: '1 40930U 15052A   26177.91328592  .00001538  00000+0  10540-3 0  9999',
+    tle2: '2 40930   5.9973  85.3306 0007890 177.8458 182.1704 14.82522407581270'
   }
 })
 
