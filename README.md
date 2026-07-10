@@ -20,7 +20,7 @@
 
 > 📹 **Demo Video**
 >
-> https://github.com/studentofstars/Satellite/assets/demo.mp4
+> [https://github.com/studentofstars/Satellite/assets/demo.mp4](https://github.com/studentofstars/Satellite/blob/main/assets/demo.mp4)
 
 ---
 
