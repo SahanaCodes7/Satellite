@@ -1,5 +1,5 @@
 
-# 🛰️ SatTrack3D — ISRO Satellite Tracker
+#  SatTrack3D — ISRO Satellite Tracker
 
 <div align="center">
 
@@ -14,17 +14,17 @@
 
 ---
 
-## 🚀 Live Demo
+##  Live Demo
 
 🔗 **[https://studentofstars.github.io/Satellite/](https://studentofstars.github.io/Satellite/)**
 
-> 📹 **Demo Video**
+>  **Demo Video**
 >
 > [https://github.com/studentofstars/Satellite/assets/demo.mp4](https://github.com/studentofstars/Satellite/blob/main/assets/demo.mp4)
 
 ---
 
-## 📡 About
+##  About
 
 **SatTrack3D** is a real-time satellite tracking platform that monitors 85 ISRO satellites with live SGP4 orbital propagation. Built with a hacker/terminal aesthetic inspired by eDEX-UI, this collaborative project by two students delivers both 2D map and 3D interactive globe views for complete orbital awareness. Track live satellite positions, predict passes over your location, and explore space from your browser.
 
