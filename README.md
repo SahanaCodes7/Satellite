@@ -30,24 +30,24 @@
 
 ---
 
-## 🚀 What Makes This Special
+##  What Makes This Special
 
 | Feature | Details |
 |---------|---------|
-| 🛰️ Satellites Tracked | 85 ISRO satellites + Aditya-L1 |
-| 🌍 Views | Interactive 2D Map + 3D Globe |
-| ⚡ Propagation | Real-time SGP4 orbital mechanics |
-| ☀️ Deep Space | NASA JPL HORIZONS for Aditya-L1 |
-| 📡 Sky Passes | GPS-based pass predictions |
-| 🎨 UI Style | Hacker/terminal aesthetic (eDEX-UI inspired) |
-| 🔍 Search | Live satellite name + mission type filter |
-| 📸 Screenshot | One-click globe image capture |
+|  Satellites Tracked | 85 ISRO satellites + Aditya-L1 |
+|  Views | Interactive 2D Map + 3D Globe |
+|  Propagation | Real-time SGP4 orbital mechanics |
+|  Deep Space | NASA JPL HORIZONS for Aditya-L1 |
+|  Sky Passes | GPS-based pass predictions |
+|  UI Style | Hacker/terminal aesthetic (eDEX-UI inspired) |
+|  Search | Live satellite name + mission type filter |
+|  Screenshot | One-click globe image capture |
 
 ---
 
-## ✨ Features
+##  Features
 
-### 🗺️ 2D Map View
+###  2D Map View
 
 - Real-time tracking of 85 ISRO satellites on a world map
 - Live satellite movement with ground track paths
@@ -56,7 +56,7 @@
 - Satellite status indicators (Active, Maintenance, Critical, Inactive)
 - Special Aditya-L1 solar observatory tracking via NASA JPL HORIZONS API
 
-### 🌍 3D Globe View
+###  3D Globe View
 
 - Interactive 3D Earth with real satellite texture
 - All 85 satellites rendered as glowing colored dots (correctly hidden behind globe)
@@ -68,7 +68,7 @@
 - Toggle between Ground Track and Orbit Ring in info panel
 - Aditya-L1 symbolic gold marker showing direction to Sun-Earth L1 point
 
-### 🧭 Navigation & UI
+###  Navigation & UI
 
 - Home / 2D Map / 3D Globe buttons in navbar
 - Search satellite by name or mission type (filters all 85 live)
@@ -76,7 +76,7 @@
 - UTC live clock in top-left panel
 - Mission type color legend (toggleable)
 
-### 🌅 Sky Passes
+###  Sky Passes
 
 - "Sky Passes" button in navbar
 - Uses your real GPS location (or defaults to New Delhi)
@@ -85,13 +85,13 @@
 - Click satellite name → selects and zooms on globe
 - Works on both 2D and 3D views
 
-### 📊 Satellite Info Panel
+###  Satellite Info Panel
 
 - Name, mission type, status badge
 - Live latitude, longitude, altitude, velocity
 - Next pass over India countdown timer
 
-### ☀️ Aditya-L1 Special Tracking
+###  Aditya-L1 Special Tracking
 
 - India's solar observatory tracked separately via **NASA JPL HORIZONS API**
 - Real position data: distance from Earth, velocity, distance in AU
@@ -103,7 +103,7 @@
 
 ---
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 | Category | Technology |
 |----------|-----------|
@@ -119,7 +119,7 @@
 
 ---
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 src/
@@ -142,7 +142,7 @@ src/
 
 ---
 
-## 🚀 Installation & Setup
+##  Installation & Setup
 
 ### Prerequisites
 
@@ -172,7 +172,7 @@ npm run preview
 
 ---
 
-## 📖 How to Use
+##  How to Use
 
 1. **Open the Application** — Visit the live link or run locally with `npm run dev`
 2. **Choose Your View** — Click "2D MAP" for flat world map or "3D GLOBE" for interactive globe
@@ -182,35 +182,35 @@ npm run preview
 
 ---
 
-## 🎨 Satellite Color Legend
+##  Satellite Color Legend
 
 | Color | Mission Type |
 |-------|-------------|
-| 🟢 Green | Earth Observation |
-| 🔵 Cyan | Navigation |
-| 🟡 Yellow | Communication |
-| 🟠 Orange | Meteorological |
-| 🟣 Purple | Experimental / Technology |
-| 🔴 Red | Radar Imaging |
-| 🟡 Gold | Solar Observatory (Aditya-L1) |
+|  Green | Earth Observation |
+|  Cyan | Navigation |
+|  Yellow | Communication |
+|  Orange | Meteorological |
+|  Purple | Experimental / Technology |
+|  Red | Radar Imaging |
+|  Gold | Solar Observatory (Aditya-L1) |
 
 ---
 
-## 👥 Contributors
+##  Contributors
 
-- Built with ❤️ for space enthusiasts
+- Built with  for space enthusiasts
 - [Mrutyunjaya Muduli](https://github.com/studentofstars)
 - [Sahana L](https://github.com/SahanaCodes7)
 
 ---
 
-## 📜 License
+##  License
 
 MIT License — See [LICENSE](LICENSE) file for details.
 
 ---
 
-## 🙏 Acknowledgments
+##  Acknowledgments
 
 - **satellite.js** — SGP4 orbital propagation engine
 - **N2YO** — TLE data and satellite information
