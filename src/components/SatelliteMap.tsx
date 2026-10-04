@@ -33,10 +33,8 @@ interface SatelliteMapProps {
 const INITIAL_MAP_CENTER: [number, number] = [20.5937, 78.9629]
 const INITIAL_MAP_ZOOM = 2
 
-const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY
-const CARTO_TILE_URL = CARTO_API_KEY
-  ? `https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png?key=${CARTO_API_KEY}`
-  : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY || 'cb1_49ny_1_f98c5f7ffeb90848086fd8f7'
+const CARTO_TILE_URL = `https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png?key=${CARTO_API_KEY}`
 
 const getSatelliteColor = (status: string) => {
   const color = status === 'active' ? '#00ff41' : status === 'maintenance' ? '#ffea00' : '#ff0040'
