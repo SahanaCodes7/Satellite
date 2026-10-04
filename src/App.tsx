@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense, useCallback, useContext } from 'react'
+import { useState, useEffect, lazy, Suspense, useCallback, useContext, useRef } from 'react'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { 
@@ -18,10 +18,12 @@ import {
   Database
 } from 'lucide-react'
 import { 
+  clearAdityaL1PositionCache,
   initializeTLEData,
   initializeSatelliteRecords, 
   calculateAllSatellitePositions,
   type SatellitePosition,
+  type SatelliteId,
   type TLEDataSource
 } from './lib/satelliteTracker'
 import Globe3D from './components/Globe3D'
@@ -34,6 +36,21 @@ const SatelliteMap = lazy(() => import('./components/SatelliteMap'))
 // Re-export SatellitePosition as SatelliteData for compatibility
 type SatelliteData = SatellitePosition
 
+const ADITYA_REFRESH_INTERVAL_MS = 5 * 60 * 1000
+
+function formatCountdown(milliseconds: number) {
+  const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000))
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
+}
+
+function formatDistanceChange(distanceChange: number) {
+  if (distanceChange > 0.1) return `+${distanceChange.toFixed(1)} km/hr (moving away)`
+  if (distanceChange < -0.1) return `${distanceChange.toFixed(1)} km/hr (moving closer)`
+  return '~0.0 km/hr (stable)'
+}
+
 function SatelliteTracker() {
   const [satellites, setSatellites] = useState<SatelliteData[]>([])
   const [selectedSatellite, setSelectedSatellite] = useState<SatelliteData | null>(null)
@@ -43,8 +60,11 @@ function SatelliteTracker() {
   const [viewMode, setViewMode] = useState<'list' | 'map'>('map')
   const [isInitialized, setIsInitialized] = useState(false)
   const [dataSource, setDataSource] = useState<TLEDataSource>('fallback')
-  const [trackingSatelliteId, setTrackingSatelliteId] = useState<number | null>(null)
-  const { onSatelliteSelect } = useContext(UIContext)
+  const [trackingSatelliteId, setTrackingSatelliteId] = useState<SatelliteId | null>(null)
+  const [isAdityaRefreshing, setIsAdityaRefreshing] = useState(false)
+  const [nextAdityaRefreshAt, setNextAdityaRefreshAt] = useState(() => Date.now() + ADITYA_REFRESH_INTERVAL_MS)
+  const updatePositionsRef = useRef<() => Promise<void>>(async () => {})
+  const { onSatelliteSelect, onSearchSubmit } = useContext(UIContext)
 
   // Initialize satellite records on mount
   useEffect(() => {
@@ -90,12 +110,12 @@ function SatelliteTracker() {
   }, [])
 
   // Update satellite positions
-  const updatePositions = useCallback(() => {
+  const updatePositions = useCallback(async () => {
     if (!isInitialized) return
     
     const now = new Date()
     setSystemTime(now)
-    const positions = calculateAllSatellitePositions(now)
+    const positions = await calculateAllSatellitePositions(now)
     console.log('Calculated positions:', positions.length, 'satellites')
     setSatellites(positions)
     
@@ -107,6 +127,10 @@ function SatelliteTracker() {
       }
     }
   }, [isInitialized, selectedSatellite])
+
+  useEffect(() => {
+    updatePositionsRef.current = updatePositions
+  }, [updatePositions])
 
   useEffect(() => {
     if (!isInitialized) return
@@ -128,19 +152,10 @@ function SatelliteTracker() {
     }
   }, [isInitialized, updatePositions])
 
-  useEffect(() => {
-    if (!onSatelliteSelect) return
-    const unsubscribe = onSatelliteSelect((satellite: SatelliteData) => {
-      if (!satellite) return
-      const fullSatellite = satellites.find((sat) => sat.id === satellite.id)
-      if (fullSatellite) setSelectedSatellite(fullSatellite)
-    })
-    return () => unsubscribe()
-  }, [onSatelliteSelect, satellites])
-
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'text-green-400'
+      case 'active':
+      case 'ACTIVE': return 'text-green-400'
       case 'maintenance': return 'text-yellow-400'
       case 'critical': return 'text-red-400'
       default: return 'text-gray-400'
@@ -149,7 +164,8 @@ function SatelliteTracker() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'active': return <CheckCircle className="w-4 h-4" />
+      case 'active':
+      case 'ACTIVE': return <CheckCircle className="w-4 h-4" />
       case 'maintenance': return <Clock className="w-4 h-4" />
       case 'critical': return <AlertTriangle className="w-4 h-4" />
       default: return <Activity className="w-4 h-4" />
@@ -182,6 +198,171 @@ function SatelliteTracker() {
       setViewMode('map')
       setTrackingSatelliteId(null)
     }, 450)
+  }
+
+  const selectSatellite = useCallback((sat: SatelliteData) => {
+    setSelectedSatellite(sat)
+    if (!sat.isDeepSpace) return
+
+    setIsAdityaRefreshing(true)
+    updatePositions().finally(() => setIsAdityaRefreshing(false))
+  }, [updatePositions])
+
+  const refreshAdityaL1 = useCallback(() => {
+    clearAdityaL1PositionCache()
+    setIsAdityaRefreshing(true)
+    updatePositionsRef.current().finally(() => {
+      setIsAdityaRefreshing(false)
+      setNextAdityaRefreshAt(Date.now() + ADITYA_REFRESH_INTERVAL_MS)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!isInitialized) return
+
+    setNextAdityaRefreshAt(Date.now() + ADITYA_REFRESH_INTERVAL_MS)
+    const intervalId = window.setInterval(refreshAdityaL1, ADITYA_REFRESH_INTERVAL_MS)
+    return () => window.clearInterval(intervalId)
+  }, [isInitialized, refreshAdityaL1])
+
+  useEffect(() => {
+    if (!onSearchSubmit) return
+    const unsubscribe = onSearchSubmit((query: string) => {
+      const lower = query.trim().toLowerCase()
+      if (!lower) return
+
+      const match = satellites.find((sat) => {
+        const searchText = [
+          sat.name,
+          sat.type,
+          sat.noradId === null ? 'l1 solar sun observatory aditya' : String(sat.noradId),
+          sat.mission ?? ''
+        ].join(' ').toLowerCase()
+
+        return searchText.includes(lower)
+      })
+
+      if (match) selectSatellite(match)
+    })
+    return () => unsubscribe()
+  }, [onSearchSubmit, satellites, selectSatellite])
+
+  useEffect(() => {
+    if (!onSatelliteSelect) return
+    const unsubscribe = onSatelliteSelect((satellite: SatelliteData) => {
+      if (!satellite) return
+      const fullSatellite = satellites.find((sat) => sat.id === satellite.id)
+      if (fullSatellite) {
+        selectSatellite(fullSatellite)
+        return
+      }
+
+      if (satellite.isDeepSpace) {
+        selectSatellite({
+          ...satellite,
+          latitude: 0,
+          longitude: 0,
+          altitude: 1502347,
+          velocity: 0.387,
+          launchDate: 'Sep 2, 2023',
+          signalStrength: 100,
+          lastUpdate: new Date(),
+          distanceFromEarth: 1502347,
+          distanceAU: 0.01004,
+          distanceChangeKmPerHour: 0,
+          isRealData: false
+        })
+      }
+    })
+    return () => unsubscribe()
+  }, [onSatelliteSelect, satellites, selectSatellite])
+
+  const renderAdityaL1Panel = () => {
+    if (!selectedSatellite?.isDeepSpace) return null
+    const distanceChange = selectedSatellite.distanceChangeKmPerHour ?? 0
+    const distanceChangeLabel = formatDistanceChange(distanceChange)
+    const nextRefreshCountdown = formatCountdown(nextAdityaRefreshAt - systemTime.getTime())
+
+    const updatedTime = selectedSatellite.lastUpdate.toLocaleTimeString('en-US', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      timeZone: 'UTC'
+    })
+
+    return (
+      <div className="w-full box-border space-y-4 overflow-x-hidden break-words">
+        <div className="w-full box-border overflow-x-hidden rounded border border-[#ffaa00] bg-black/30 p-3 shadow-[0_0_18px_rgba(255,170,0,0.16)]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h3 className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-bold tracking-[1px] text-[#ffaa00] glow-yellow">☀️ {selectedSatellite.name}</h3>
+              <p className="mt-1 max-w-full overflow-hidden text-ellipsis whitespace-nowrap text-xs text-yellow-600">SOLAR OBS.</p>
+            </div>
+            <div className="flex items-center gap-2 rounded border border-green-400 px-3 py-1 text-green-400">
+              <CheckCircle className="h-4 w-4" />
+              <span className="text-sm font-bold">ACTIVE</span>
+            </div>
+          </div>
+          {selectedSatellite.isRealData && (
+            <div className="mt-3 inline-flex max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded border border-green-400/70 bg-green-500/10 px-2 py-1 text-[11px] font-black text-green-300">
+              ● LIVE DATA
+            </div>
+          )}
+          {!selectedSatellite.isRealData && (
+            <div className="mt-3 inline-flex max-w-full overflow-hidden text-ellipsis whitespace-nowrap rounded border border-orange-500/70 bg-orange-500/10 px-2 py-1 text-[11px] font-black text-orange-300">
+              ⚠ ESTIMATED DATA
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 border-y border-yellow-600/30 py-3">
+          <span className="whitespace-nowrap rounded-l bg-black/20 p-2 text-[10px] text-[rgba(255,170,0,0.6)]">DISTANCE</span>
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap rounded-r bg-black/20 p-2 text-right font-mono text-[11px] font-bold text-yellow-300">{Math.round(selectedSatellite.distanceFromEarth ?? selectedSatellite.altitude).toLocaleString()} km</span>
+          <span className="whitespace-nowrap rounded-l bg-black/20 p-2 text-[10px] text-[rgba(255,170,0,0.6)]">DIST (AU)</span>
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap rounded-r bg-black/20 p-2 text-right font-mono text-[11px] font-bold text-yellow-300">{(selectedSatellite.distanceAU ?? 0.01004).toFixed(5)} AU</span>
+          <span className="whitespace-nowrap rounded-l bg-black/20 p-2 text-[10px] text-[rgba(255,170,0,0.6)]">VELOCITY</span>
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap rounded-r bg-black/20 p-2 text-right font-mono text-[11px] font-bold text-yellow-300">{selectedSatellite.velocity.toFixed(3)} km/s</span>
+          <span className="whitespace-nowrap rounded-l bg-black/20 p-2 text-[10px] text-[rgba(255,170,0,0.6)]">DIST CHANGE</span>
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap rounded-r bg-black/20 p-2 text-right font-mono text-[11px] font-bold text-yellow-300">{distanceChangeLabel}</span>
+          <span className="whitespace-nowrap rounded-l bg-black/20 p-2 text-[10px] text-[rgba(255,170,0,0.6)]">LOCATION</span>
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap rounded-r bg-black/20 p-2 text-right font-mono text-[11px] font-bold text-yellow-300">Sun-Earth L1 Point</span>
+        </div>
+
+        <div className="border-b border-yellow-600/30 pb-3">
+          <div className="mb-2 text-xs font-black tracking-widest text-yellow-700">MISSION</div>
+          <div className="text-sm text-yellow-300">Solar wind & CME observation</div>
+          <div className="text-sm text-yellow-300">Studying solar corona</div>
+        </div>
+
+        <div className="w-full box-border rounded border border-[#ffaa00]/70 bg-yellow-500/10 p-2 text-[10px] leading-[1.5] text-yellow-200 shadow-[0_0_14px_rgba(255,170,0,0.12)] [word-break:break-word]" style={{ wordWrap: 'break-word', whiteSpace: 'normal' }}>
+          <div className="mb-2 font-black tracking-wider text-[#ffaa00]">WHY NO MAP TRACKING?</div>
+          <div className="space-y-1 leading-relaxed">
+            <div>Aditya-L1 orbits the Sun-Earth L1 Lagrange point, 1.5 MILLION km away.</div>
+            <div>It has no latitude/longitude on Earth.</div>
+            <div>Standard TLE tracking doesn't apply.</div>
+            <div>Position data via NASA JPL HORIZONS.</div>
+          </div>
+        </div>
+
+        <div className="space-y-2 text-xs text-yellow-600">
+          <div>📡 Source: NASA JPL HORIZONS</div>
+          <div>🔄 Next update in: {nextRefreshCountdown}</div>
+          <div className="flex items-center justify-between gap-2">
+            <span>🕐 Updated: {updatedTime} UTC</span>
+            <button
+              type="button"
+              onClick={refreshAdityaL1}
+              disabled={isAdityaRefreshing}
+              className="flex items-center gap-1 rounded border border-yellow-500/60 px-2 py-1 font-black text-yellow-300 transition hover:bg-yellow-500/10 disabled:opacity-60"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isAdityaRefreshing ? 'animate-spin' : ''}`} />
+              REFRESH
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (isLoading) {
@@ -289,10 +470,10 @@ function SatelliteTracker() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35, ease: 'easeOut' }}
-          className="grid grid-cols-1 lg:grid-cols-4 gap-4"
+          className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_300px]"
         >
           {/* Map Panel */}
-          <div className="terminal-panel p-4 lg:col-span-3 h-[600px]">
+          <div className="terminal-panel h-[600px] p-4">
             <Suspense fallback={
               <div className="flex items-center justify-center h-full">
                 <RefreshCw className="w-8 h-8 animate-spin text-green-400" />
@@ -304,7 +485,7 @@ function SatelliteTracker() {
                 selectedSatellite={selectedSatellite}
                 onSelectSatellite={(sat) => {
                   const fullSatData = satellites.find(s => s.id === sat.id)
-                  if (fullSatData) setSelectedSatellite(fullSatData)
+                  if (fullSatData) selectSatellite(fullSatData)
                 }}
                 onHome={() => setSelectedSatellite(null)}
               />
@@ -312,12 +493,16 @@ function SatelliteTracker() {
           </div>
 
           {/* Selected Satellite Info */}
-          <div className="terminal-panel p-4 lg:col-span-1">
+          <div className="terminal-panel box-border w-[300px] min-w-[300px] max-w-[300px] flex-shrink-0 overflow-hidden p-3">
             <h2 className="text-lg font-bold flex items-center gap-2 mb-4">
               <Satellite className="w-5 h-5" />
               SATELLITE INFO
             </h2>
-            {selectedSatellite ? (
+            {selectedSatellite?.isDeepSpace ? (
+              <>
+                {renderAdityaL1Panel()}
+              </>
+            ) : selectedSatellite ? (
               <div className="space-y-4">
                 <div className="bg-black/30 p-3 rounded border border-green-500">
                   <div className="font-bold text-lg glow-green">{selectedSatellite.name}</div>
@@ -406,25 +591,32 @@ function SatelliteTracker() {
                 <motion.div
                   key={sat.id}
                   whileHover={{ scale: 1.01, x: 4 }}
-                  onClick={() => setSelectedSatellite(sat)}
+                  onClick={() => selectSatellite(sat)}
                   className={`mt-2 grid grid-cols-[minmax(220px,1fr)_110px_120px_140px] items-center gap-4 rounded border px-3 py-3 cursor-pointer transition-all ${
-                    selectedSatellite?.id === sat.id 
-                      ? 'bg-green-900/30 border-green-500 shadow-[0_0_18px_rgba(0,255,65,0.18)]' 
-                      : 'bg-black/20 border-green-900/30 hover:border-green-600 hover:bg-green-950/20 hover:shadow-[0_0_16px_rgba(0,255,65,0.12)]'
+                    sat.isDeepSpace && selectedSatellite?.id === sat.id
+                      ? 'bg-yellow-900/20 border-[#ffaa00] shadow-[0_0_18px_rgba(255,170,0,0.18)]'
+                      : sat.isDeepSpace
+                        ? 'bg-black/20 border-yellow-600/30 hover:border-[#ffaa00] hover:bg-yellow-950/20 hover:shadow-[0_0_16px_rgba(255,170,0,0.12)]'
+                        : selectedSatellite?.id === sat.id 
+                          ? 'bg-green-900/30 border-green-500 shadow-[0_0_18px_rgba(0,255,65,0.18)]' 
+                          : 'bg-black/20 border-green-900/30 hover:border-green-600 hover:bg-green-950/20 hover:shadow-[0_0_16px_rgba(0,255,65,0.12)]'
                   }`}
                 >
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+                        sat.isDeepSpace ? 'bg-[#ffaa00] shadow-[0_0_10px_#ffaa00]' :
                         selectedSatellite?.id === sat.id ? 'bg-green-300 animate-pulse shadow-[0_0_12px_#00ff41]' :
                         sat.status === 'active' ? 'bg-green-400 shadow-[0_0_8px_#00ff41]' : 
                         sat.status === 'maintenance' ? 'bg-yellow-400 shadow-[0_0_8px_#ffea00]' : 'bg-red-400 shadow-[0_0_8px_#ff0040]'
                       }`} />
-                      <span className="truncate text-sm font-bold text-green-300">{sat.name}</span>
+                      <span className={`truncate text-sm font-bold ${sat.isDeepSpace ? 'text-[#ffaa00]' : 'text-green-300'}`}>
+                        {sat.isDeepSpace ? '☀️ ' : ''}{sat.name}
+                      </span>
                     </div>
-                    <div className="mt-1 truncate text-xs text-green-700">{sat.type}</div>
+                    <div className={`mt-1 truncate text-xs ${sat.isDeepSpace ? 'text-yellow-700' : 'text-green-700'}`}>{sat.type}</div>
                   </div>
-                  <div className="text-right text-sm font-bold tabular-nums text-green-500">{sat.noradId}</div>
+                  <div className={`text-right text-sm font-bold tabular-nums ${sat.isDeepSpace ? 'text-yellow-500' : 'text-green-500'}`}>{sat.noradId ?? 'N/A'}</div>
                   <div className="text-right text-sm tabular-nums text-green-500">{sat.launchDate}</div>
                   <motion.button
                     whileHover={{ scale: 1.05 }}
@@ -466,7 +658,9 @@ function SatelliteTracker() {
               TELEMETRY DATA
             </h2>
             
-            {selectedSatellite ? (
+            {selectedSatellite?.isDeepSpace ? (
+              renderAdityaL1Panel()
+            ) : selectedSatellite ? (
               <div className="space-y-4">
                 {/* Satellite Header */}
                 <div className="bg-black/30 p-4 rounded border border-green-500">

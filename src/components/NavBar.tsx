@@ -37,9 +37,18 @@ export default function NavBar() {
   const satelliteEntries = useMemo(
     () =>
       getSatelliteList()
+        .filter((sat) => !sat.isDeepSpace && sat.noradId !== null)
         .map((sat): SkyPassSatellite | null => {
           const satrec = getSatelliteRecord(sat.noradId)
-          return satrec ? { ...sat, satrec } : null
+          return satrec && sat.noradId !== null
+            ? {
+                id: sat.noradId,
+                name: sat.name,
+                type: sat.type,
+                noradId: sat.noradId,
+                satrec
+              }
+            : null
         })
         .filter((sat): sat is SkyPassSatellite => Boolean(sat)),
     [totalSatellites]
@@ -56,11 +65,16 @@ export default function NavBar() {
   const filteredSuggestions = useMemo(() => {
     const query = searchQuery.trim().toLowerCase()
     if (!query) return []
+    
     return allSatelliteEntries
       .filter(
-        (sat) =>
-          sat.name.toLowerCase().includes(query) ||
-          sat.type.toLowerCase().includes(query)
+        (sat) => {
+          const aliases = sat.isDeepSpace ? 'aditya l1 solar sun observatory lagrange' : ''
+          return [sat.name, sat.type, sat.mission ?? '', aliases]
+            .join(' ')
+            .toLowerCase()
+            .includes(query)
+        }
       )
       .slice(0, 12)
   }, [searchQuery, allSatelliteEntries])
@@ -218,9 +232,10 @@ export default function NavBar() {
                   {filteredSuggestions.map((sat, idx) => {
                     const query = searchQuery.trim().toLowerCase()
                     const nameIdx = sat.name.toLowerCase().indexOf(query)
+                    const isAdityaL1 = Boolean(sat.isDeepSpace)
                     return (
                       <button
-                        key={sat.noradId}
+                        key={sat.id}
                         type="button"
                         onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
@@ -232,23 +247,32 @@ export default function NavBar() {
                         onMouseEnter={() => setHighlightIndex(idx)}
                         className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-all ${
                           idx === highlightIndex
-                            ? 'bg-[#00ff41]/12 text-[#00ff41]'
-                            : 'text-green-300/80 hover:bg-[#00ff41]/6'
+                            ? isAdityaL1
+                              ? 'bg-yellow-500/12 text-yellow-400'
+                              : 'bg-[#00ff41]/12 text-[#00ff41]'
+                            : isAdityaL1
+                              ? 'text-yellow-300/80 hover:bg-yellow-500/6'
+                              : 'text-green-300/80 hover:bg-[#00ff41]/6'
                         }`}
                       >
                         <span
                           className={`h-2 w-2 shrink-0 rounded-full ${
                             idx === highlightIndex
-                              ? 'bg-[#00ff41] shadow-[0_0_8px_#00ff41]'
-                              : 'bg-green-600/60'
+                              ? isAdityaL1
+                                ? 'bg-yellow-400 shadow-[0_0_8px_#ffaa00]'
+                                : 'bg-[#00ff41] shadow-[0_0_8px_#00ff41]'
+                              : isAdityaL1
+                                ? 'bg-yellow-600/60'
+                                : 'bg-green-600/60'
                           }`}
                         />
                         <span className="min-w-0 flex-1">
                           <span className="block truncate text-sm font-bold">
+                            {isAdityaL1 ? '☀️ ' : ''}
                             {nameIdx >= 0 ? (
                               <>
                                 {sat.name.slice(0, nameIdx)}
-                                <span className="text-[#00ff41] underline underline-offset-2 decoration-[#00ff41]/50">
+                                <span className={isAdityaL1 ? 'text-yellow-400 underline underline-offset-2 decoration-yellow-400/50' : 'text-[#00ff41] underline underline-offset-2 decoration-[#00ff41]/50'}>
                                   {sat.name.slice(nameIdx, nameIdx + query.length)}
                                 </span>
                                 {sat.name.slice(nameIdx + query.length)}
@@ -257,8 +281,8 @@ export default function NavBar() {
                               sat.name
                             )}
                           </span>
-                          <span className="block truncate text-[10px] uppercase tracking-wider text-green-700">
-                            {sat.type} &middot; NORAD {sat.noradId}
+                          <span className={`block truncate text-[10px] uppercase tracking-wider ${isAdityaL1 ? 'text-yellow-700' : 'text-green-700'}`}>
+                            {sat.type} &middot; {isAdityaL1 ? 'SUN-EARTH L1' : `NORAD ${sat.noradId}`}
                           </span>
                         </span>
                       </button>
@@ -322,6 +346,33 @@ export default function NavBar() {
               ))}
             </div>
           )}
+
+          {/* Aditya-L1 Deep Space Section */}
+          <div className="mt-3 border-y border-yellow-600/30 py-3">
+            <div className="font-black uppercase text-[11px] mb-2 text-yellow-600 flex items-center gap-1">
+              <span>☀️</span>
+              <span>DEEP SPACE ASSETS</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const adityaL1 = getSatelliteList().find((sat) => sat.id === 'aditya-l1')
+                if (adityaL1) emitSatelliteSelect(adityaL1)
+                setShowPassesPanel(false)
+              }}
+              className="flex w-full items-center justify-between rounded border border-yellow-600/30 px-2 py-2 text-left transition hover:bg-yellow-500/10"
+            >
+              <div>
+                <span className="truncate text-sm font-bold text-yellow-400">
+                  ADITYA-L1 <span className="text-yellow-700">• L1 LAGRANGE POINT</span>
+                </span>
+                <span className="block text-[10px] text-yellow-700">
+                  At Sun-Earth L1 • Distance: 1.5M km
+                </span>
+              </div>
+              <span className="text-[10px] text-yellow-500 font-bold">ACTIVE</span>
+            </button>
+          </div>
         </div>
       )}
 

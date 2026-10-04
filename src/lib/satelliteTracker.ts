@@ -1,4 +1,5 @@
 import * as satellite from 'satellite.js'
+import { clearAdityaL1Cache, fetchAdityaL1Position } from '../services/adityaL1Service'
 
 // ========================================
 // CELESTRAK LIVE TLE DATA FETCHER
@@ -19,6 +20,21 @@ interface TLEData {
   tle1: string
   tle2: string
   omm?: CelestrakOMM
+}
+
+export type SatelliteId = number | 'aditya-l1'
+
+export interface SatelliteListEntry {
+  id: SatelliteId
+  name: string
+  type: string
+  status: string
+  isDeepSpace?: boolean
+  noradId: number | null
+  tle1?: string | null
+  tle2?: string | null
+  color?: string
+  mission?: string
 }
 
 export type TLEDataSource = 'live' | 'cached' | 'fallback'
@@ -61,6 +77,23 @@ const CACHE_DURATION = 2 * 60 * 60 * 1000
 
 // Local storage key for caching. Versioned to avoid reusing older, broader caches.
 const CACHE_KEY = 'sattrack3d_indian_tle_cache_v2'
+
+export const ADITYA_L1_ENTRY: SatelliteListEntry = {
+  id: 'aditya-l1',
+  name: 'ADITYA-L1',
+  type: 'SOLAR OBSERVATORY',
+  status: 'ACTIVE',
+  isDeepSpace: true,
+  noradId: null,
+  tle1: null,
+  tle2: null,
+  color: '#ffaa00',
+  mission: 'Solar wind & CME observation, studying solar corona'
+}
+
+export const clearAdityaL1PositionCache = clearAdityaL1Cache
+
+const ADITYA_L1_NORAD_ID = 57754
 
 // N2YO India country list, launch years 2026 through 2000 inclusive.
 const INDIAN_SATELLITES_THROUGH_2000: IndianSatelliteMetadata[] = [
@@ -114,6 +147,7 @@ const INDIAN_SATELLITES_THROUGH_2000: IndianSatelliteMetadata[] = [
   { noradId: 41384, name: 'IRNSS 1F', launchYear: 2016, launchMonth: 3, launchDay: 10 },
   { noradId: 41241, name: 'IRNSS-1E', launchYear: 2016, launchMonth: 1, launchDay: 20 },
   { noradId: 41028, name: 'GSAT 15', launchYear: 2015, launchMonth: 11, launchDay: 6 },
+  { noradId: 40930, name: 'ASTROSAT', launchYear: 2015, launchMonth: 9, launchDay: 28 },
   { noradId: 40880, name: 'GSAT 6', launchYear: 2015, launchMonth: 8, launchDay: 27 },
   { noradId: 40547, name: 'IRNSS 1D', launchYear: 2015, launchMonth: 3, launchDay: 28 },
   { noradId: 40332, name: 'GSAT 16', launchYear: 2014, launchMonth: 12, launchDay: 5 },
@@ -162,7 +196,10 @@ const INDIAN_SATELLITE_BY_NORAD_ID = new Map(
   ])
 )
 
-const INDIAN_NORAD_IDS = new Set(INDIAN_SATELLITES_THROUGH_2000.map(({ noradId }) => noradId))
+const EARTH_ORBITING_INDIAN_SATELLITES = INDIAN_SATELLITES_THROUGH_2000.filter(
+  ({ noradId }) => noradId !== ADITYA_L1_NORAD_ID
+)
+const INDIAN_NORAD_IDS = new Set(EARTH_ORBITING_INDIAN_SATELLITES.map(({ noradId }) => noradId))
 
 // Name searches reduce requests; the NORAD whitelist below is still the authority.
 const INDIAN_SATELLITE_QUERY_TERMS = [
@@ -170,7 +207,7 @@ const INDIAN_SATELLITE_QUERY_TERMS = [
   'INSAT', 'XPOSAT', 'CHANDRAYAAN', 'ADITYA', 'AFR', 'POEM',
   'RISAT', 'CARTOSAT', 'RESOURCESAT', 'SCATSAT', 'PRATHAM', 'IRNSS',
   'SARAL', 'SRMSAT', 'JUGNU', 'YOUTHSAT', 'STUDSAT', 'OCEANSAT',
-  'IMS', 'HAMSAT', 'IRS', 'KALPANA', 'MARS ORBITER'
+  'IMS', 'HAMSAT', 'IRS', 'KALPANA', 'MARS ORBITER', 'ASTROSAT'
 ]
 
 // Indian satellite search patterns and their display types
@@ -198,6 +235,7 @@ const ISRO_SATELLITE_PATTERNS: { pattern: string; type: string }[] = [
   { pattern: 'CHANDRAYAAN', type: 'Scientific' },
   { pattern: 'MARS ORBITER', type: 'Scientific' },
   { pattern: 'XPOSAT', type: 'Scientific' },
+  { pattern: 'ASTROSAT', type: 'Scientific' },
   { pattern: 'CH 3', type: 'Lunar Mission' },
   { pattern: 'HAMSAT', type: 'Amateur Radio' },
   { pattern: 'PRATHAM', type: 'Student Satellite' },
@@ -291,7 +329,7 @@ function createTLEDataFromOMM(omm: CelestrakOMM): TLEData | null {
 function filterTLEToIndianSatellites(data: Record<number, TLEData>): Record<number, TLEData> {
   const filtered: Record<number, TLEData> = {}
 
-  for (const metadata of INDIAN_SATELLITES_THROUGH_2000) {
+  for (const metadata of EARTH_ORBITING_INDIAN_SATELLITES) {
     const entry = data[metadata.noradId]
     if (!entry) continue
 
@@ -360,7 +398,7 @@ export async function fetchISROSatellitesFromCelestrak(): Promise<Record<number,
     }
   }
 
-  const missingSatellites = INDIAN_SATELLITES_THROUGH_2000.filter(
+  const missingSatellites = EARTH_ORBITING_INDIAN_SATELLITES.filter(
     ({ noradId }) => !satellites[noradId]
   )
 
@@ -635,6 +673,12 @@ export let SATELLITE_TLE_DATA: Record<number, TLEData> = filterTLEToIndianSatell
     type: 'Altimetry',
     tle1: '1 39086U 13009A   25346.85214521  .00000214  00000+0  32145-4 0  9993',
     tle2: '2 39086  98.5478  95.1478 0001478  85.4521 274.7854 14.32145214521478'
+  },
+  40930: {
+    name: 'ASTROSAT',
+    type: 'Scientific',
+    tle1: '1 40930U 15052A   26177.91328592  .00001538  00000+0  10540-3 0  9999',
+    tle2: '2 40930   5.9973  85.3306 0007890 177.8458 182.1704 14.82522407581270'
   }
 })
 
@@ -657,10 +701,10 @@ export async function initializeTLEData(): Promise<TLEDataSource> {
 }
 
 export interface SatellitePosition {
-  id: number
+  id: SatelliteId
   name: string
   type: string
-  noradId: number
+  noradId: number | null
   status: string
   latitude: number
   longitude: number
@@ -669,6 +713,13 @@ export interface SatellitePosition {
   launchDate: string
   signalStrength: number
   lastUpdate: Date
+  isDeepSpace?: boolean  // For deep space satellites like Aditya-L1
+  distanceFromEarth?: number  // Distance in km for deep space objects
+  distanceAU?: number
+  distanceChangeKmPerHour?: number
+  mission?: string
+  color?: string
+  isRealData?: boolean
 }
 
 // Cache for satellite records (parsed TLEs)
@@ -682,7 +733,9 @@ function createSatelliteRecord(data: TLEData): satellite.SatRec {
   return satellite.twoline2satrec(data.tle1, data.tle2)
 }
 
-export function getSatelliteRecord(noradId: number): satellite.SatRec | null {
+export function getSatelliteRecord(noradId: number | null): satellite.SatRec | null {
+  if (noradId === null) return null
+
   const data = SATELLITE_TLE_DATA[noradId]
   if (!data) return null
 
@@ -759,6 +812,8 @@ export function initializeSatelliteRecords(): void {
   satrecCache.clear()
 
   for (const [noradId, data] of Object.entries(SATELLITE_TLE_DATA)) {
+    if (Number(noradId) === ADITYA_L1_NORAD_ID) continue
+
     try {
       const satrec = createSatelliteRecord(data)
       satrecCache.set(parseInt(noradId), satrec)
@@ -821,7 +876,7 @@ function getOrbitalPeriodMinutes(satrec: satellite.SatRec): number {
 
 // Calculate one SGP4-propagated ground track centered on the requested time.
 export function calculateSatelliteGroundTrack(
-  noradId: number,
+  noradId: number | null,
   date: Date,
   samples = 145,
   anchorPoint?: GroundTrackAnchor
@@ -872,25 +927,40 @@ export function calculateSatelliteGroundTrack(
 }
 
 // Calculate positions for all satellites
-export function calculateAllSatellitePositions(date: Date): SatellitePosition[] {
+export async function calculateAllSatellitePositions(date: Date): Promise<SatellitePosition[]> {
   const positions: SatellitePosition[] = []
-  
-  console.log('SATELLITE_TLE_DATA keys:', Object.keys(SATELLITE_TLE_DATA).length)
-  
-  for (const { noradId } of INDIAN_SATELLITES_THROUGH_2000) {
+
+  const horizonsData = await fetchAdityaL1Position()
+  positions.push({
+    ...ADITYA_L1_ENTRY,
+    latitude: 0,
+    longitude: 0,
+    altitude: Math.round(horizonsData.distanceFromEarth),
+    velocity: parseFloat(horizonsData.velocityKmS.toFixed(3)),
+    launchDate: 'Sep 2, 2023',
+    signalStrength: 100,
+    lastUpdate: new Date(horizonsData.lastUpdated),
+    distanceFromEarth: horizonsData.distanceFromEarth,
+    distanceAU: horizonsData.distanceAU,
+    distanceChangeKmPerHour: horizonsData.distanceChangeKmPerHour,
+    isRealData: horizonsData.isRealData
+  })
+
+  for (const { noradId } of EARTH_ORBITING_INDIAN_SATELLITES) {
     const position = calculateSatellitePosition(noradId, date)
     if (position) {
       positions.push(position)
     }
   }
-  
-  console.log('Calculated positions:', positions.length)
+
   return positions
 }
 
 // Get list of all tracked satellites (without positions)
-export function getSatelliteList(): { id: number; name: string; type: string; noradId: number }[] {
-  return INDIAN_SATELLITES_THROUGH_2000
+export function getSatelliteList(): SatelliteListEntry[] {
+  return [
+    ADITYA_L1_ENTRY,
+    ...EARTH_ORBITING_INDIAN_SATELLITES
     .filter(({ noradId }) => Boolean(SATELLITE_TLE_DATA[noradId]))
     .map(({ noradId }) => {
       const data = SATELLITE_TLE_DATA[noradId]
@@ -898,7 +968,9 @@ export function getSatelliteList(): { id: number; name: string; type: string; no
         id: noradId,
         name: data.name,
         type: data.type,
+        status: 'active',
         noradId
       }
     })
+  ]
 }
