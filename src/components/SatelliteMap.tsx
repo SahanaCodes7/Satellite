@@ -32,6 +32,11 @@ interface SatelliteMapProps {
 const INITIAL_MAP_CENTER: [number, number] = [20.5937, 78.9629]
 const INITIAL_MAP_ZOOM = 2
 
+const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY
+const CARTO_TILE_URL = CARTO_API_KEY
+  ? `https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png?key=${CARTO_API_KEY}`
+  : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+
 const getSatelliteColor = (status: string) => {
   const color = status === 'active' ? '#00ff41' : status === 'maintenance' ? '#ffea00' : '#ff0040'
   return color
@@ -170,8 +175,10 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
       >
         {/* Dark theme map tiles */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | <a href="https://carto.com/">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+          url={CARTO_TILE_URL}
+          subdomains="abcd"
+          maxZoom={20}
         />
 
         {/* Map controller for animations */}
