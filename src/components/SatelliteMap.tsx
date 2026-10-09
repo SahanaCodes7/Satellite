@@ -6,6 +6,8 @@ import { Home } from 'lucide-react'
 import satIconUrl from '../assets/satellite-icon.svg'
 import 'leaflet/dist/leaflet.css'
 import { calculateSatelliteGroundTrack } from '../lib/satelliteTracker'
+import { fetchAdityaL1 } from '../lib/adityaL1'
+import type { AdityaL1Data } from '../lib/adityaL1'
 const CARTO_API_KEY = import.meta.env.VITE_CARTO_API_KEY
 
 interface SatellitePosition {
@@ -86,6 +88,39 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
   const mapRef = useRef<LeafletMap | null>(null)
   const [isZooming, setIsZooming] = useState(false)
   const [zoomLevel, setZoomLevel] = useState(2)
+  const [adityaL1, setAdityaL1] = useState<AdityaL1Data | null>(null)
+  const [adityaError, setAdityaError] = useState<string | null>(null)
+
+  useEffect(() => {
+  let cancelled = false
+
+  const loadAdityaL1 = async () => {
+    try {
+      const data = await fetchAdityaL1()
+
+      if (!cancelled) {
+        setAdityaL1(data)
+        setAdityaError(null)
+      }
+    } catch (error) {
+      if (!cancelled) {
+        setAdityaError('Unable to load Aditya-L1 data')
+        console.error(error)
+      }
+    }
+  }
+
+  void loadAdityaL1()
+
+  const intervalId = window.setInterval(() => {
+    void loadAdityaL1()
+  }, 60_000)
+
+  return () => {
+    cancelled = true
+    window.clearInterval(intervalId)
+  }
+}, [])
 
   const trackedSatellite = selectedSatellite
     ? satellites.find((sat) => sat.id === selectedSatellite.id) ?? selectedSatellite
@@ -194,6 +229,49 @@ const orbitPath = useMemo(() => {
           />
         ))}
 
+        
+        {/* Aditya-L1 mission marker */}
+        {adityaL1 && (
+          <CircleMarker
+            center={[20.5937, 78.9629]}
+            radius={8}
+            pathOptions={{
+              color: '#00e5ff',
+              fillColor: '#00e5ff',
+              fillOpacity: 1,
+              weight: 2,
+            }}
+          >
+            <Popup>
+              <div className="bg-black/90 text-cyan-300 p-3 rounded min-w-[200px]">
+                <div className="font-bold mb-2">
+                  ☀️ ADITYA-L1
+                </div>
+
+                <div>
+                  Distance from Earth:
+                  {' '}
+                  {(adityaL1.distanceFromEarthKm / 1_000_000).toFixed(3)}
+                  {' '}million km
+                </div>
+
+                <div className="mt-2 text-xs">
+                  Source: NASA JPL Horizons
+                </div>
+
+                <div className="text-xs">
+                  Data time: {adityaL1.ephemerisTime}
+                </div>
+
+                <div className="mt-2 text-yellow-300 text-xs">
+                  Position marker is illustrative, not actual coordinates.
+                </div>
+              </div>
+            </Popup>
+          </CircleMarker>
+        )}
+
+
         {/* Satellite markers */}
         {satellites.filter((sat) => !sat.isDeepSpace).map((sat) => {
           const isSelected = trackedSatellite?.id === sat.id
@@ -280,6 +358,41 @@ const orbitPath = useMemo(() => {
       >
         <Home className="h-4 w-4" />
       </button>
+
+      {/* Aditya-L1 Status */}
+      <div className="absolute bottom-2 right-2 z-[1000] bg-black/90 p-3 rounded border border-cyan-500/50 text-xs max-w-[260px]">
+        <div className="text-cyan-400 font-bold mb-2">
+          ADITYA-L1 MISSION
+        </div>
+
+        {adityaError ? (
+          <div className="text-red-400">{adityaError}</div>
+        ) : adityaL1 ? (
+          <>
+            <div className="text-green-400">
+              LIVE DATA CONNECTED
+            </div>
+
+            <div className="text-gray-300 mt-2">
+              Distance from Earth:
+            </div>
+
+            <div className="text-cyan-300 font-bold">
+              {(
+                adityaL1.distanceFromEarthKm / 1_000_000
+              ).toFixed(3)} million km
+            </div>
+
+            <div className="text-gray-400 mt-2">
+              Updated: {new Date(adityaL1.fetchedAt).toLocaleTimeString()}
+            </div>
+          </>
+        ) : (
+          <div className="text-yellow-400">
+            Loading Aditya-L1 data...
+          </div>
+        )}
+      </div>
 
       {/* Ground Track Info */}
       {trackedSatellite && !trackedSatellite.isDeepSpace && (

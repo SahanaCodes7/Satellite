@@ -1198,6 +1198,12 @@ function calculateTracksForSatellite(selectedSatellite: SatellitePosition | null
 
   const orbitPast: THREE.Vector3[] = []
   const orbitFuture: THREE.Vector3[] = []
+  const groundPast: THREE.Vector3[][] = []
+  const groundFuture: THREE.Vector3[][] = []
+  let pastSegment: THREE.Vector3[] = []
+  let futureSegment: THREE.Vector3[] = []
+  let previousPastLongitude: number | null = null
+  let previousFutureLongitude: number | null = null
   const satrec = (selectedSatellite as GlobeSatellite).satrec
   if (!satrec) return empty
 
@@ -1227,12 +1233,53 @@ function calculateTracksForSatellite(selectedSatellite: SatellitePosition | null
 
         const positionGd = satellite.eciToGeodetic(positionEci, epochGmst)
         const positionEcf = satellite.eciToEcf(positionEci, epochGmst)
+        const groundGmst = satellite.gstime(date)
+        const groundGd = satellite.eciToGeodetic(positionEci, groundGmst)
+
+        const latitude = satellite.degreesLat(groundGd.latitude)
+        const longitude = satellite.degreesLong(groundGd.longitude)
+
+        const groundPoint = latLngToVector3(
+          latitude,
+          longitude,
+          GROUND_TRACK_RADIUS
+        )
         const orbitPoint = ecfToVector3(positionEcf, scale).setLength(
           altitudeToVisualRadius(positionGd.height)
         )
 
         if (minute <= 0) orbitPast.push(orbitPoint)
         if (minute >= 0) orbitFuture.push(orbitPoint)
+        if (minute <= 0) {
+        if (
+          previousPastLongitude !== null &&
+          Math.abs(longitude - previousPastLongitude) > 180
+        ) {
+          if (pastSegment.length > 1) {
+            groundPast.push(pastSegment)
+          }
+          pastSegment = []
+        }
+
+        pastSegment.push(groundPoint)
+        previousPastLongitude = longitude
+      }
+
+      if (minute >= 0) {
+        if (
+          previousFutureLongitude !== null &&
+          Math.abs(longitude - previousFutureLongitude) > 180
+        ) {
+          if (futureSegment.length > 1) {
+            groundFuture.push(futureSegment)
+          }
+          futureSegment = []
+        }
+
+        futureSegment.push(groundPoint)
+        previousFutureLongitude = longitude
+      }
+        
       } catch {
         // skip bad samples
       }
@@ -1251,26 +1298,86 @@ function calculateTracksForSatellite(selectedSatellite: SatellitePosition | null
     }
   }
 
-  // Ground track arrays are kept empty — no surface projection on the 3D globe
-  return { orbitPast, orbitFuture, groundPast: [], groundFuture: [] }
+      if (pastSegment.length > 1) {
+        groundPast.push(pastSegment)
+      }
+
+      if (futureSegment.length > 1) {
+        groundFuture.push(futureSegment)
+      }
+
+  return {
+  orbitPast,
+  orbitFuture,
+  groundPast,
+  groundFuture,
+}    
 }
 
-function SelectedTracks({ selectedSatellite, now, externalTracks }: { selectedSatellite: SatellitePosition | null; now: Date; externalTracks?: Tracks | null }) {
-  // If parent provided tracks (computed synchronously on selection), render them immediately
+
+
+    function SelectedTracks({
+      selectedSatellite,
+      now,
+      externalTracks,
+      mode,
+    }: {
+      selectedSatellite: SatellitePosition | null
+      now: Date
+      externalTracks?: Tracks | null
+      mode: TrackDisplayMode
+    }) {
+
+  
+  // If parent provided tracks, render them immediately
   if (externalTracks) {
     return (
       <>
-        {/* Orbit path at actual altitude */}
-        {externalTracks.orbitPast.length > 1 && (
-          <DynamicLine points={externalTracks.orbitPast} color="#ffaa00" opacity={0.55} />
+        {mode === 'ground' ? (
+          <>
+            {/* Past ground track */}
+            <DynamicLineSegments
+              segments={externalTracks.groundPast}
+              color="#ffaa00"
+              opacity={0.9}
+            />
+
+            {/* Future ground track */}
+            <DynamicLineSegments
+              segments={externalTracks.groundFuture}
+              color="#00ffff"
+              opacity={0.9}
+              dashed
+            />
+          </>
+        ) : (
+          <>
+            {/* Past orbit path */}
+            {externalTracks.orbitPast.length > 1 && (
+              <DynamicLine
+                points={externalTracks.orbitPast}
+                color="#ffaa00"
+                opacity={0.55}
+              />
+            )}
+
+            {/* Future orbit path */}
+            {externalTracks.orbitFuture.length > 1 && (
+              <DynamicLine
+                points={externalTracks.orbitFuture}
+                color="#00ffff"
+                opacity={0.4}
+                dashed
+              />
+            )}
+          </>
         )}
-        {externalTracks.orbitFuture.length > 1 && (
-          <DynamicLine points={externalTracks.orbitFuture} color="#00ffff" opacity={0.4} dashed />
-        )}
+
         <SelectionConnectorLine selectedSatellite={selectedSatellite} />
       </>
     )
   }
+
 
   // Fallback: if no external tracks provided, compute locally at most every 30s
   const [tracks, setTracks] = useState<Tracks>({ orbitPast: [], orbitFuture: [], groundPast: [], groundFuture: [] })
@@ -1300,6 +1407,18 @@ function SelectedTracks({ selectedSatellite, now, externalTracks }: { selectedSa
       {tracks.orbitFuture.length > 1 && (
         <DynamicLine points={tracks.orbitFuture} color="#00ffff" opacity={0.4} dashed />
       )}
+      <DynamicLineSegments
+      segments={tracks.groundPast}
+      color="#ffaa00"
+      opacity={0.9}
+    />
+
+    <DynamicLineSegments
+      segments={tracks.groundFuture}
+      color="#00ffff"
+      opacity={0.9}
+      dashed
+    />
       <SelectionConnectorLine selectedSatellite={selectedSatellite} />
     </>
   )
@@ -1623,7 +1742,14 @@ export default function Globe3D() {
         <CameraDistanceTracker cameraDistanceRef={cameraDistanceRef} />
         <CountryBorders />
         {trackDisplayMode === 'ground' ? (
-          <SelectedTracks selectedSatellite={selectedSatellite} now={now} externalTracks={computedTracks} />
+            
+        <SelectedTracks
+          selectedSatellite={selectedSatellite}
+          now={now}
+          externalTracks={computedTracks}
+          mode={trackDisplayMode}
+        />
+
         ) : (
           <SelectedOrbitRing selectedSatellite={selectedSatellite} />
         )}
