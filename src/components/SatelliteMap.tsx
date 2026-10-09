@@ -105,24 +105,22 @@ export default function SatelliteMap({ satellites, selectedSatellite, onSelectSa
     []
   )
   
-  const orbitPath = useMemo(() => {
-    if (!trackedSatellite || trackedSatellite.isDeepSpace) return []
+  
+const orbitPath = useMemo(() => {
+  if (!trackedSatellite || trackedSatellite.isDeepSpace) return []
 
-    return calculateSatelliteGroundTrack(
-      trackedSatellite.noradId,
-      trackedSatellite.lastUpdate ?? new Date(),
-      145,
-      {
-        latitude: trackedSatellite.latitude,
-        longitude: trackedSatellite.longitude
-      }
-    )
-  }, [
-    trackedSatellite?.noradId,
-    trackedSatellite?.lastUpdate,
-    trackedSatellite?.latitude,
-    trackedSatellite?.longitude
-  ])
+  return calculateSatelliteGroundTrack(
+    trackedSatellite.noradId,
+    trackedSatellite.lastUpdate ?? new Date(),
+    145
+  )
+}, [
+  trackedSatellite?.noradId,
+  trackedSatellite?.lastUpdate,
+  trackedSatellite?.latitude,
+  trackedSatellite?.longitude
+])
+
 
   const handleHomeClick = () => {
     const map = mapRef.current
